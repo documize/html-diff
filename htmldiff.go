@@ -26,32 +26,51 @@ type treeRune struct {
 	pos    posT
 }
 
-type addedT map[*html.Node]uint64
+type addedT map[*html.Node]bool
 
 func getPos(n *html.Node, m addedT) posT {
 	if n == nil {
 		return nil
 	}
 	var ret posT
-	for root := n; root.Parent != nil; root = root.Parent {
+	for root := n; root.Parent != nil && root.DataAtom != atom.Body; root = root.Parent {
 		var before uint64
-		if root.Parent != nil {
-			for sib := root.Parent.FirstChild; sib != root; sib = sib.NextSibling {
+		for sib := root.Parent.FirstChild; sib != root; sib = sib.NextSibling {
+			if m[sib] {
+				//fmt.Println("getPos skipped for ", sib, m[sib])
+			} else {
 				before++
 			}
 		}
-		before -= m[root]
+
 		ret = append(ret, before)
 	}
 	return ret
 }
 
+func posEqualDepth(a, b posT) bool {
+	return len(a) == len(b)
+}
+
 func posEqual(a, b posT) bool {
-	if len(a) != len(b) {
+	if !posEqualDepth(a, b) {
 		return false
 	}
 	for i, aa := range a {
 		if aa != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func posSoftMatch(a, b posT) bool {
+	if !posEqualDepth(a, b) {
+		return false
+	}
+	for i, aa := range a {
+		bb := b[i]
+		if aa != bb && aa != bb+1 {
 			return false
 		}
 	}
@@ -76,7 +95,7 @@ func (dd diffData) Equal(i, j int) bool {
 	if ii.letter != jj.letter && ii.letter > 0 && jj.letter > 0 {
 		return false
 	}
-	if !posEqual(ii.pos, jj.pos) {
+	if !posEqualDepth(ii.pos, jj.pos) {
 		return false
 	}
 	return nodeTreeEqual(ii.leaf, jj.leaf)
@@ -190,7 +209,7 @@ func (c *Config) Find(versions []string) ([]string, error) {
 	sourceTrees := make([]*html.Node, len(versions))
 	sourceTreeRunes := make([]*[]treeRune, len(versions))
 	firstLeaves := make([]int, len(versions))
-	parallelErrors := make(chan error)
+	parallelErrors := make(chan error, len(versions))
 	for v, vv := range versions {
 		go func(v int, vv string) {
 			var err error
@@ -206,7 +225,7 @@ func (c *Config) Find(versions []string) ([]string, error) {
 				leaf1, ok := firstLeaf(findBody(sourceTrees[v]))
 				//fmt.Printf("First Leaf: %#v %v\n", leaf1, ok)
 				if leaf1 == nil || !ok {
-					firstLeaves[v] = 1 // probably wrong
+					firstLeaves[v] = 0 // probably wrong
 					//fmt.Printf("First Leaf is nil or !ok: %d %v %v\n", v, leaf1, ok)
 				} else {
 					for x, y := range tr {
@@ -235,11 +254,13 @@ func (c *Config) Find(versions []string) ([]string, error) {
 			dd := diffData{a: sourceTreeRunes[0], b: sourceTreeRunes[m+1]}
 			changes := diff.Diff(len(*sourceTreeRunes[0]), len(*sourceTreeRunes[m+1]), dd)
 			//fmt.Printf("Changes: %d %#v\n", m, changes)
+			/* POSSIBLE FUTURE ENHANCEMENT, BUT HEADER MUST BE REMOVED FIRST
 			if len(changes) == 0 { // no changes, so just return the original version
 				mergedHTMLs[m] = versions[0]
 				parallelErrors <- nil
 				return
 			}
+			*/
 			changes = granular(c.Granularity, dd, changes)
 			mergedTree, err := c.walkChanges(changes, sourceTreeRunes[0], sourceTreeRunes[m+1], firstLeaves[0], firstLeaves[m+1])
 			if err != nil {
@@ -281,12 +302,6 @@ func (c *Config) walkChanges(changes []diff.Change, ap, bp *[]treeRune, aIdx, bI
 	}
 	a := *ap
 	b := *bp
-	if changes[0].A < aIdx {
-		aIdx = changes[0].A
-	}
-	if changes[0].B < bIdx {
-		bIdx = changes[0].B
-	}
 	ctx := &appendContext{c: c, target: mergedTree, added: make(addedT)}
 	for _ /*i*/, change := range changes {
 		//fmt.Printf("Change %d %#v\n", i, change)
@@ -333,6 +348,7 @@ type appendContext struct {
 	target, lastProto *html.Node
 	lastText          string
 	lastAction        rune
+	lastPos           posT
 	added             addedT
 }
 
@@ -344,46 +360,47 @@ func (ap *appendContext) append(action rune, tr treeRune) {
 	if tr.letter > 0 {
 		text = string(tr.letter)
 	}
-	if ap.lastProto == tr.leaf && ap.lastAction == action && tr.leaf.Type == html.TextNode && text != "" {
+	if ap.lastProto == tr.leaf && ap.lastAction == action && tr.leaf.Type == html.TextNode && text != "" && posEqualDepth(ap.lastPos, tr.pos) {
 		ap.lastText += text
 		return
 	}
-	ap.flush0(action, tr.leaf)
+	ap.flush0(action, tr.leaf, tr.pos)
 	if tr.leaf.Type == html.TextNode { // reload the buffer
 		ap.lastText = text
 		return
 	}
-	ap.append0(action, "", tr.leaf)
+	ap.append0(action, "", tr.leaf, tr.pos)
 }
 
 func (ap *appendContext) flush() {
-	ap.flush0(0, nil)
+	ap.flush0(0, nil, nil)
 }
 
-func (ap *appendContext) flush0(action rune, proto *html.Node) {
+func (ap *appendContext) flush0(action rune, proto *html.Node, pos posT) {
 	if ap.lastText != "" {
-		ap.append0(ap.lastAction, ap.lastText, ap.lastProto) // flush the buffer
+		ap.append0(ap.lastAction, ap.lastText, ap.lastProto, ap.lastPos) // flush the buffer
 	}
 	// reset the buffer
 	ap.lastProto = proto
 	ap.lastAction = action
+	ap.lastPos = pos
 	ap.lastText = ""
 }
 
-func (ap *appendContext) append0(action rune, text string, proto *html.Node) {
-    if proto==nil {
-        return
-    }
+func (ap *appendContext) append0(action rune, text string, proto *html.Node, pos posT) {
+	if proto == nil {
+		return
+	}
 	//fmt.Println(action, text, proto)
-	appendPoint, protoAncestor := ap.lastMatchingLeaf(proto)
+	appendPoint, protoAncestor := ap.lastMatchingLeaf(proto, action)
 	/*
 		fmt.Println("targetTree: ", VizTree(ap.target))
 		fmt.Println("appendPoint: ", VizTree(appendPoint))
 		fmt.Println("protoAncestor: ", VizTree(appendPoint))
 	*/
 	if appendPoint == nil || protoAncestor == nil {
-		fmt.Println("nil append point or protoAncestor") // TODO review ... make no-op, or return error?
-        return
+		panic("nil append point or protoAncestor") // TODO review ... make no-op, or return error?
+		return
 	}
 	newLeaf := new(html.Node)
 	copyNode(newLeaf, proto)
@@ -407,6 +424,10 @@ func (ap *appendContext) append0(action rune, text string, proto *html.Node) {
 			insertNode.Attr = ap.c.FormattedSpan
 		}
 		insertNode.AppendChild(newLeaf)
+		if add {
+			ap.added[newLeaf] = true
+			//fmt.Println("Incr0", newLeaf, ap.added[newLeaf])
+		}
 		newLeaf = insertNode
 	}
 	//fmt.Println("proto", proto, "ancestor", protoAncestor)
@@ -419,15 +440,26 @@ func (ap *appendContext) append0(action rune, text string, proto *html.Node) {
 		copyNode(above, proto)
 		above.AppendChild(newLeaf)
 		if add {
-			ap.added[above]++
-			//fmt.Println("Incr", above)
+			ap.added[newLeaf] = true
+			//fmt.Println("Incr1", newLeaf, ap.added[newLeaf])
 		}
 		newLeaf = above
 	}
 	appendPoint.AppendChild(newLeaf)
+	if add {
+		ap.added[newLeaf] = true
+		//fmt.Println("Incr2", newLeaf, ap.added[newLeaf])
+	} else {
+		for apt := appendPoint; apt != nil; apt = apt.Parent {
+			if ap.added[apt] {
+				//fmt.Println("Appending non-Add to created", apt, ap.added[apt])
+				delete(ap.added, apt)
+			}
+		}
+	}
 }
 
-func (ap *appendContext) lastMatchingLeaf(proto *html.Node) (appendPoint, protoAncestor *html.Node) {
+func (ap *appendContext) lastMatchingLeaf(proto *html.Node, action rune) (appendPoint, protoAncestor *html.Node) {
 	var candidates []*html.Node
 	for cand := ap.target; cand != nil; cand = cand.LastChild {
 		candidates = append([]*html.Node{cand}, candidates...)
@@ -436,8 +468,8 @@ func (ap *appendContext) lastMatchingLeaf(proto *html.Node) (appendPoint, protoA
 		_ = cni
 		//fmt.Println("candidate", cni, can.Data)
 		for anc := proto; anc.Parent != nil; anc = anc.Parent {
-			if ap.leavesEqual(can, anc) {
-				//fmt.Println("found", can, anc)
+			if ap.leavesEqual(can, anc, action) {
+				//fmt.Println("found candidate", cni, can, anc)
 				return can, anc
 			}
 		}
@@ -445,7 +477,7 @@ func (ap *appendContext) lastMatchingLeaf(proto *html.Node) (appendPoint, protoA
 	return nil, nil
 }
 
-func (ap *appendContext) leavesEqual(a, b *html.Node) bool {
+func (ap *appendContext) leavesEqual(a, b *html.Node, action rune) bool {
 	if a == b {
 		return true
 	}
@@ -458,13 +490,20 @@ func (ap *appendContext) leavesEqual(a, b *html.Node) bool {
 	if !nodeEqual(a, b) {
 		return false
 	}
-	gpa := getPos(a, ap.added)
-	gpb := getPos(b, ap.added)
-	if !posEqual(gpa, gpb) {
-		//fmt.Println("leaves Not equal", a, gpa, b, gpb)
-		return false
+	gpa := getPos(a, ap.added) // what we are building
+	gpb := getPos(b, nil)      // what we are adding in
+	if action == '+' {
+		if !posEqual(gpa, gpb) {
+			//fmt.Println("leaves not equal", a, gpa, b, gpb)
+			return false
+		}
+	} else {
+		if !posSoftMatch(gpa, gpb) {
+			//fmt.Println("leaves not equal", a, gpa, b, gpb)
+			return false
+		}
 	}
-	return ap.leavesEqual(a.Parent, b.Parent)
+	return ap.leavesEqual(a.Parent, b.Parent, action)
 }
 
 func copyNode(to, from *html.Node) {

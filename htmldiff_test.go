@@ -42,7 +42,7 @@ var simpleTests = []simpleTest{
 	{[]string{`Documize Logo:<img src="http://documize.com/img/documize-logo.png" alt="Documize">`,
 		"Documize Logo:", `<img src="http://documize.com/img/documize-logo.png" alt="Documize">`},
 		[]string{`Documize Logo:<span style="background-color: lightpink; text-decoration: line-through;"><img src="http://documize.com/img/documize-logo.png" alt="Documize"/></span>`,
-			`<span style="background-color: lightpink; text-decoration: line-through;">Documize Logo:</span><span style="background-color: lightpink; text-decoration: line-through;"><img src="http://documize.com/img/documize-logo.png" alt="Documize"/></span><span style="background-color: palegreen; text-decoration: underline;"><img src="http://documize.com/img/documize-logo.png" alt="Documize"/></span>`}},
+			`<span style="background-color: lightpink; text-decoration: line-through;">Documize Logo:</span><img src="http://documize.com/img/documize-logo.png" alt="Documize"/>`}},
 
 	{[]string{"<ul><li>1</li><li>2</li><li>3</li></ul>",
 		"<ul><li>one</li><li>two</li><li>three</li></ul>",
@@ -50,14 +50,16 @@ var simpleTests = []simpleTest{
 		[]string{`<ul><li><span style="background-color: lightpink; text-decoration: line-through;">1</span></li><li><span style="background-color: lightpink; text-decoration: line-through;">2</span></li><li><span style="background-color: lightpink; text-decoration: line-through;">3</span></li><li><span style="background-color: palegreen; text-decoration: underline;">one</span></li><li><span style="background-color: palegreen; text-decoration: underline;">two</span></li><li><span style="background-color: palegreen; text-decoration: underline;">three</span></li></ul>`,
 			`<ul><li>1</li><li><i><span style="background-color: lightskyblue; text-decoration: overline;">2</span></i></li><li>3</li><li><span style="background-color: palegreen; text-decoration: underline;">4</span></li></ul>`}},
 
-	{[]string{doc1 + doc2 + doc3, doc1 + doc2 + doc3, doc1 + doc3, doc1 + "<i>" + doc2 + "</i>" + doc3, doc1 + doc2 + "inserted" + doc3},
+	{[]string{doc1 + doc2 + doc3 + doc4, doc1 + doc2 + doc3 + doc4, doc1 + doc3 + doc4, doc1 + "<i>" + doc2 + "</i>" + doc3 + doc4,
+		doc1 + doc2 + "inserted" + doc3 + doc4, doc1 + doc2 + doc3 + "<div><p>New Div</p></div>" + doc4},
 		[]string{``,
 			`<li><span style="background-color: lightpink; text-decoration: line-through;">Automated document formatting</span></li>`,
 			`<span style="background-color: lightskyblue; text-decoration: overline;">Automated document formatting</span>`,
-			`<span style="background-color: palegreen; text-decoration: underline;">inserted</span>`}},
+			`<span style="background-color: palegreen; text-decoration: underline;">inserted</span>`,
+			``}},
 
-	{[]string{bbcNews1 + bbcNews2, bbcNews1 + "<i>HTML-Diff-Inserted</i>" + bbcNews2},
-		[]string{`<i><span style="` + cfg.InsertedSpan[0].Val + `">HTML-Diff-Inserted</span></i>`}}, // just a parse test really
+	{[]string{bbcNews1 + bbcNews2, bbcNews1 + "<div><i>HTML-Diff-Inserted</i></div>" + bbcNews2},
+		[]string{`<div><i><span style="` + cfg.InsertedSpan[0].Val + `">HTML-Diff-Inserted</span></i></div>`}},
 
 	{[]string{`<table border="1" style="width:100%">
   <tr>
@@ -119,16 +121,16 @@ var simpleTests = []simpleTest{
     <td>Jill</td>
   </tr>
   <tr>
-    <td><span style="background-color: lightpink; text-decoration: line-through;">Derby</span><span style="background-color: palegreen; text-decoration: underline;">Samson</span></td>
-    <td>and</td> 
-    <td><span style="background-color: lightpink; text-decoration: line-through;">Jo</span><span style="background-color: palegreen; text-decoration: underline;">Delil</span>a<span style="background-color: lightpink; text-decoration: line-through;">n</span><span style="background-color: palegreen; text-decoration: underline;">h</span></td>
-  </tr>
-<span style="background-color: palegreen; text-decoration: underline;">  </span><tr><span style="background-color: palegreen; text-decoration: underline;">
-    </span><td><span style="background-color: palegreen; text-decoration: underline;">Derby</span></td><span style="background-color: palegreen; text-decoration: underline;">
+    <td><span style="background-color: palegreen; text-decoration: underline;">Samson</span></td><span style="background-color: palegreen; text-decoration: underline;">
     </span><td><span style="background-color: palegreen; text-decoration: underline;">and</span></td><span style="background-color: palegreen; text-decoration: underline;"> 
-    </span><td><span style="background-color: palegreen; text-decoration: underline;">Joan</span></td><span style="background-color: palegreen; text-decoration: underline;">
+    </span><td><span style="background-color: palegreen; text-decoration: underline;">Delilah</span></td><span style="background-color: palegreen; text-decoration: underline;">
   </span></tr><span style="background-color: palegreen; text-decoration: underline;">
-</span></tbody></table>`}},
+  </span><tr><span style="background-color: palegreen; text-decoration: underline;">
+    </span><td>Derby</td>
+    <td>and</td> 
+    <td>Joan</td>
+  </tr>
+</tbody></table>`}},
 }
 
 func TestSimple(t *testing.T) {

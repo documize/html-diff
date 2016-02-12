@@ -1,5 +1,6 @@
 package htmldiff_test
 
+// from: documize.com
 const doc1 = `
 <!DOCTYPE html>
 <html>
@@ -113,8 +114,8 @@ const doc3 = `
 				<img src="img/spidernet.png" class="img-responsive">
 			</div>
 		</div>
-  	 </div>
-	 <div id="pricing" class="block">
+  	 </div>`
+const doc4 = ` <div id="pricing" class="block">
   	 	<div class="container">
 				<div class="title">
 					<h3>Plans & Pricing</h3>
@@ -674,9 +675,9 @@ require(['istats-1'], function(istats) {
             /**/
         </script>
     </div>
-</div><p>
+</div>
    `
-const bbcNews2 =    `
+const bbcNews2 = `<p>
 The new award of shares takes Mr Pichai's total stock value to approximately $650m.</p><p>Mr Pichai's share award will vest incrementally each quarter until 2019. In other words, full control over the shares will pass to him on a gradual basis.</p><p>The Google chief executive joined the company since 2004, initially leading product management on a number of Google's client software products, including Google Chrome] and Chrome OS, as well as being largely responsible for Google Drive. He also oversaw the development of Gmail and Google Maps.</p>                                                                                                    <p>He previously worked in engineering and product management at Applied Materials and as a management consultant at McKinsey &amp; Company.</p><p>It comes at a time of heightened scrutiny of Google's tax affairs, following the company's deal with HM Revenue &amp; Customs to pay back taxes dating from 2005. </p><p>The controversial tax deal was labelled derisory by Labour. Shadow Chancellor John McDonnell called for greater transparency, saying it looked like a "sweetheart deal".</p><p>"HMRC seems to have settled for a relatively small amount in comparison with the overall profits that are made by the company in this country.  And some of the independent analysts have argued that it should be at least 10 times this amount," he said.</p><p><a href="https://abc.xyz/investor/pdf/20141231_google_10K.pdf" class="story-body__link-external">Google's regulatory filings</a> for for the period 2005 to 2014, show it generated sales of £24bn ($34.6bn) in the UK during the period with an estimated profit of about £7.2bn on those sales. Page 83 of its most recent 10k report states "revenues by geography are based on the billing addresses of our customers".</p><p>Last week, Alphabet - Google's parent company - surpassed Apple as the world's most valuable firm after it reported a profit of $4.9bn (£3.4bn) in the three months to the end of December, an increase from $4.7bn a year ago.</p><p>On an annual basis, Alphabet made $16.3bn, but the figures showed that the "Other Bets" business lost $3.6bn during the period, while Google's operating income rose to $23.4bn, as online advertising increased.</p><p><i>An earlier version of this story included a table featuring a list of highest-paid CEOs in the US, which had figures from 2012, not 2015.</i></p>
                                                                                                 </div>
 </div>
