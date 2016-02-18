@@ -18,7 +18,12 @@ type Config struct {
 	InsertedSpan, DeletedSpan, FormattedSpan []html.Attribute
 }
 
-type posT []uint64
+type posTT struct {
+	nodesBefore int
+	node        *html.Node
+}
+
+type posT []posTT
 
 type treeRune struct {
 	leaf   *html.Node
@@ -26,24 +31,25 @@ type treeRune struct {
 	pos    posT
 }
 
-type addedT map[*html.Node]bool
+type amendedT map[*html.Node]rune
 
-func getPos(n *html.Node, m addedT) posT {
+func getPos(n *html.Node, m amendedT) posT {
 	if n == nil {
 		return nil
 	}
 	var ret posT
 	for root := n; root.Parent != nil && root.DataAtom != atom.Body; root = root.Parent {
-		var before uint64
+		var before int
 		for sib := root.Parent.FirstChild; sib != root; sib = sib.NextSibling {
-			if m[sib] {
+			switch m[sib] {
+			case '+':
 				//fmt.Println("getPos skipped for ", sib, m[sib])
-			} else {
+			default:
 				before++
 			}
 		}
 
-		ret = append(ret, before)
+		ret = append(ret, posTT{before, root})
 	}
 	return ret
 }
@@ -57,7 +63,7 @@ func posEqual(a, b posT) bool {
 		return false
 	}
 	for i, aa := range a {
-		if aa != b[i] {
+		if aa.nodesBefore != b[i].nodesBefore {
 			return false
 		}
 	}
@@ -70,7 +76,7 @@ func posSoftMatch(a, b posT) bool {
 	}
 	for i, aa := range a {
 		bb := b[i]
-		if aa != bb && aa != bb+1 {
+		if aa.nodesBefore > bb.nodesBefore {
 			return false
 		}
 	}
@@ -114,6 +120,17 @@ func nodeTreeEqual(leafA, leafB *html.Node) bool {
 	return false // one of the leaves has a parent, the other does not
 }
 
+func attrEqual(base, comp *html.Node) bool {
+	for a := range comp.Attr {
+		if comp.Attr[a].Key != base.Attr[a].Key ||
+			comp.Attr[a].Namespace != base.Attr[a].Namespace ||
+			comp.Attr[a].Val != base.Attr[a].Val {
+			return false
+		}
+	}
+	return true
+}
+
 func nodeEqualExText(base, comp *html.Node) bool {
 	if base == nil || comp == nil {
 		return false
@@ -124,12 +141,8 @@ func nodeEqualExText(base, comp *html.Node) bool {
 		len(comp.Attr) != len(base.Attr) {
 		return false
 	}
-	for a := range comp.Attr {
-		if comp.Attr[a].Key != base.Attr[a].Key ||
-			comp.Attr[a].Namespace != base.Attr[a].Namespace ||
-			comp.Attr[a].Val != base.Attr[a].Val {
-			return false
-		}
+	if !attrEqual(base, comp) {
+		return false
 	}
 	//if comp.Data != base.Data && base.Type != html.TextNode {
 	//	return false // only test for the same data if not a text node
@@ -302,7 +315,7 @@ func (c *Config) walkChanges(changes []diff.Change, ap, bp *[]treeRune, aIdx, bI
 	}
 	a := *ap
 	b := *bp
-	ctx := &appendContext{c: c, target: mergedTree, added: make(addedT)}
+	ctx := &appendContext{c: c, target: mergedTree, amended: make(amendedT)}
 	for _ /*i*/, change := range changes {
 		//fmt.Printf("Change %d %#v\n", i, change)
 		for aIdx < change.A && bIdx < change.B {
@@ -343,168 +356,6 @@ func (c *Config) walkChanges(changes []diff.Change, ap, bp *[]treeRune, aIdx, bI
 	return mergedTree, nil
 }
 
-type appendContext struct {
-	c                 *Config
-	target, lastProto *html.Node
-	lastText          string
-	lastAction        rune
-	lastPos           posT
-	added             addedT
-}
-
-func (ap *appendContext) append(action rune, tr treeRune) {
-	if tr.leaf == nil {
-		return
-	}
-	var text string
-	if tr.letter > 0 {
-		text = string(tr.letter)
-	}
-	if ap.lastProto == tr.leaf && ap.lastAction == action && tr.leaf.Type == html.TextNode && text != "" && posEqualDepth(ap.lastPos, tr.pos) {
-		ap.lastText += text
-		return
-	}
-	ap.flush0(action, tr.leaf, tr.pos)
-	if tr.leaf.Type == html.TextNode { // reload the buffer
-		ap.lastText = text
-		return
-	}
-	ap.append0(action, "", tr.leaf, tr.pos)
-}
-
-func (ap *appendContext) flush() {
-	ap.flush0(0, nil, nil)
-}
-
-func (ap *appendContext) flush0(action rune, proto *html.Node, pos posT) {
-	if ap.lastText != "" {
-		ap.append0(ap.lastAction, ap.lastText, ap.lastProto, ap.lastPos) // flush the buffer
-	}
-	// reset the buffer
-	ap.lastProto = proto
-	ap.lastAction = action
-	ap.lastPos = pos
-	ap.lastText = ""
-}
-
-func (ap *appendContext) append0(action rune, text string, proto *html.Node, pos posT) {
-	if proto == nil {
-		return
-	}
-	//fmt.Println(action, text, proto)
-	appendPoint, protoAncestor := ap.lastMatchingLeaf(proto, action)
-	/*
-		fmt.Println("targetTree: ", VizTree(ap.target))
-		fmt.Println("appendPoint: ", VizTree(appendPoint))
-		fmt.Println("protoAncestor: ", VizTree(appendPoint))
-	*/
-	if appendPoint == nil || protoAncestor == nil {
-		panic("nil append point or protoAncestor") // TODO review ... make no-op, or return error?
-		return
-	}
-	newLeaf := new(html.Node)
-	copyNode(newLeaf, proto)
-	if proto.Type == html.TextNode {
-		newLeaf.Data = text
-	}
-	add := false
-	if action != '=' {
-		insertNode := &html.Node{
-			Type:     html.ElementNode,
-			DataAtom: atom.Span,
-			Data:     "span",
-		}
-		switch action {
-		case '+':
-			insertNode.Attr = ap.c.InsertedSpan
-			add = true
-		case '-':
-			insertNode.Attr = ap.c.DeletedSpan
-		case '~':
-			insertNode.Attr = ap.c.FormattedSpan
-		}
-		insertNode.AppendChild(newLeaf)
-		if add {
-			ap.added[newLeaf] = true
-			//fmt.Println("Incr0", newLeaf, ap.added[newLeaf])
-		}
-		newLeaf = insertNode
-	}
-	//fmt.Println("proto", proto, "ancestor", protoAncestor)
-	for proto = proto.Parent; proto != nil && proto != protoAncestor; proto = proto.Parent {
-		//if proto.DataAtom == atom.Tbody {
-		//	fmt.Println("proto add Tbody", VizTree(proto))
-		//	fmt.Println("proto add AppendPoint", VizTree(appendPoint))
-		//}
-		above := new(html.Node)
-		copyNode(above, proto)
-		above.AppendChild(newLeaf)
-		if add {
-			ap.added[newLeaf] = true
-			//fmt.Println("Incr1", newLeaf, ap.added[newLeaf])
-		}
-		newLeaf = above
-	}
-	appendPoint.AppendChild(newLeaf)
-	if add {
-		ap.added[newLeaf] = true
-		//fmt.Println("Incr2", newLeaf, ap.added[newLeaf])
-	} else {
-		for apt := appendPoint; apt != nil; apt = apt.Parent {
-			if ap.added[apt] {
-				//fmt.Println("Appending non-Add to created", apt, ap.added[apt])
-				delete(ap.added, apt)
-			}
-		}
-	}
-}
-
-func (ap *appendContext) lastMatchingLeaf(proto *html.Node, action rune) (appendPoint, protoAncestor *html.Node) {
-	var candidates []*html.Node
-	for cand := ap.target; cand != nil; cand = cand.LastChild {
-		candidates = append([]*html.Node{cand}, candidates...)
-	}
-	for cni, can := range candidates {
-		_ = cni
-		//fmt.Println("candidate", cni, can.Data)
-		for anc := proto; anc.Parent != nil; anc = anc.Parent {
-			if ap.leavesEqual(can, anc, action) {
-				//fmt.Println("found candidate", cni, can, anc)
-				return can, anc
-			}
-		}
-	}
-	return nil, nil
-}
-
-func (ap *appendContext) leavesEqual(a, b *html.Node, action rune) bool {
-	if a == b {
-		return true
-	}
-	if a == nil || b == nil {
-		return false
-	}
-	if a.DataAtom == atom.Body && b.DataAtom == atom.Body {
-		return true // body nodes are always equal
-	}
-	if !nodeEqual(a, b) {
-		return false
-	}
-	gpa := getPos(a, ap.added) // what we are building
-	gpb := getPos(b, nil)      // what we are adding in
-	if action == '+' {
-		if !posEqual(gpa, gpb) {
-			//fmt.Println("leaves not equal", a, gpa, b, gpb)
-			return false
-		}
-	} else {
-		if !posSoftMatch(gpa, gpb) {
-			//fmt.Println("leaves not equal", a, gpa, b, gpb)
-			return false
-		}
-	}
-	return ap.leavesEqual(a.Parent, b.Parent, action)
-}
 
 func copyNode(to, from *html.Node) {
 	to.Attr = from.Attr
@@ -522,12 +373,8 @@ func nodeEqual(base, comp *html.Node) bool {
 		len(comp.Attr) != len(base.Attr) {
 		return false
 	}
-	for a := range comp.Attr {
-		if comp.Attr[a].Key != base.Attr[a].Key ||
-			comp.Attr[a].Namespace != base.Attr[a].Namespace ||
-			comp.Attr[a].Val != base.Attr[a].Val {
-			return false
-		}
+	if !attrEqual(base, comp) {
+		return false
 	}
 	return true
 }

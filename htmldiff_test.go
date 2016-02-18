@@ -23,7 +23,7 @@ type simpleTest struct {
 }
 
 var simpleTests = []simpleTest{
-
+/**/
 	{[]string{"chinese中文", "chinese中文", "中文", "chinese"},
 		[]string{"chinese中文",
 			`<span style="background-color: lightpink; text-decoration: line-through;">chinese</span>中文`,
@@ -60,7 +60,7 @@ var simpleTests = []simpleTest{
 
 	{[]string{bbcNews1 + bbcNews2, bbcNews1 + "<div><i>HTML-Diff-Inserted</i></div>" + bbcNews2},
 		[]string{`<div><i><span style="` + cfg.InsertedSpan[0].Val + `">HTML-Diff-Inserted</span></i></div>`}},
-
+/**/
 	{[]string{`<table border="1" style="width:100%">
   <tr>
     <td>Jack</td>
@@ -72,7 +72,7 @@ var simpleTests = []simpleTest{
     <td>and</td> 
     <td>Joan</td>
   </tr>
-</table>`,
+</table>`, /**/
 		`<table border="1" style="width:100%">
   <tr>
     <td>Jack</td>
@@ -101,8 +101,30 @@ var simpleTests = []simpleTest{
     <td>and</td> 
     <td>Joan</td>
   </tr>
+</table>`, /**/
+		`<table border="1" style="width:100%">
+  <tr>
+    <td>Jack</td>
+    <td>and</td> 
+    <td>Jill</td>
+  </tr>
+  <tr>
+    <td>Samson</td>
+    <td>and</td> 
+    <td>Delilah</td>
+  </tr>
+  <tr>
+    <td>Derby</td>
+    <td>and</td> 
+    <td>Joan</td>
+  </tr>
+  <tr>
+    <td>Tweedledum</td>
+    <td>and</td> 
+    <td>Tweedledee</td>
+  </tr>
 </table>`},
-		[]string{`<table border="1" style="width:100%">
+		[]string{ /**/ `<table border="1" style="width:100%">
   <tbody><tr>
     <td>Jack</td>
     <td><b><span style="background-color: lightskyblue; text-decoration: overline;">and</span></b></td> 
@@ -130,6 +152,28 @@ var simpleTests = []simpleTest{
     <td>and</td> 
     <td>Joan</td>
   </tr>
+</tbody></table>`,/**/
+			`<table border="1" style="width:100%">
+  <tbody><tr>
+    <td>Jack</td>
+    <td>and</td> 
+    <td>Jill</td>
+  </tr>
+  <tr>
+    <td><span style="background-color: palegreen; text-decoration: underline;">Samson</span></td><span style="background-color: palegreen; text-decoration: underline;">
+    </span><td><span style="background-color: palegreen; text-decoration: underline;">and</span></td><span style="background-color: palegreen; text-decoration: underline;"> 
+    </span><td>De<span style="background-color: palegreen; text-decoration: underline;">lilah</span></td><span style="background-color: palegreen; text-decoration: underline;">
+  </span></tr><span style="background-color: palegreen; text-decoration: underline;">
+  </span><tr><span style="background-color: palegreen; text-decoration: underline;">
+    </span><td><span style="background-color: palegreen; text-decoration: underline;">De</span>rby</td>
+    <td>and</td> 
+    <td>Joan</td><span style="background-color: palegreen; text-decoration: underline;">
+  </span></tr><span style="background-color: palegreen; text-decoration: underline;">
+  </span><tr><span style="background-color: palegreen; text-decoration: underline;">
+    </span><td><span style="background-color: palegreen; text-decoration: underline;">Tweedledum</span></td><span style="background-color: palegreen; text-decoration: underline;">
+    </span><td><span style="background-color: palegreen; text-decoration: underline;">and</span></td><span style="background-color: palegreen; text-decoration: underline;"> 
+    </span><td><span style="background-color: palegreen; text-decoration: underline;">Tweedledee</span></td>
+  </tr>
 </tbody></table>`}},
 }
 
@@ -143,7 +187,10 @@ func TestSimple(t *testing.T) {
 		for d := range st.diffs {
 			if d < len(res) {
 				fn := fmt.Sprintf("testout/simple%d-%d.html", s, d)
-				ioutil.WriteFile(fn, []byte(res[d]), 0777)
+				err := ioutil.WriteFile(fn, []byte(res[d]), 0777)
+				if err != nil {
+					t.Error(err)
+				}
 				if !strings.Contains(res[d], st.diffs[d]) {
 					if len(res[d]) < 1024 {
 						t.Errorf("Simple test %d diff %d wanted: `%s` got: `%s`", s, d, st.diffs[d], res[d])
