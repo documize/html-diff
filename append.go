@@ -116,34 +116,28 @@ func (ap *appendContext) append0(action rune, text string, proto *html.Node, pos
 	}
 }
 
-/*
 func (ap *appendContext) matchingNodes(tree, match *html.Node, pos posT, action rune) []*html.Node {
 	ret := []*html.Node{}
 	if len(pos) > 0 {
-		skip := 0
+		//skip := 0
 		lastPos := len(pos) - 1
 		for ch := tree.FirstChild; ch != nil; ch = ch.NextSibling {
-			if skip == pos[lastPos].nodesBefore {
+			//if skip == pos[lastPos].nodesBefore {
 				ret = append(ap.matchingNodes(ch, match, pos[:lastPos], action), ret...)
-			}
-			switch action {
-			case '+':
-            skip++
-			default:
-            if ap.amended[tree] != '+' {
-				skip++
-			}}
+			//}
+			//if ap.amended[tree] != '-' {
+			//	skip++
+			//}
 		}
 	}
 	//if !(ap.amended[tree] == '+' && action != '+') { // can never add to an added node if from base
-		if nodeEqual(tree, match) {
-			//fmt.Printf("matchingNodes %#v %#v\n", tree.Data, match.Data)
-			ret = append(ret, tree)
-		}
+	if nodeEqual(tree, match) {
+		//fmt.Printf("matchingNodes %#v %#v\n", tree.Data, match.Data)
+		ret = append(ret, tree)
+	}
 	//}
 	return ret
 }
-*/
 
 func (ap *appendContext) lastMatchingLeaf(proto *html.Node, action rune, pos posT) (appendPoint, protoAncestor *html.Node) {
 	//fmt.Println("lastMatchingLeaf", proto, action, pos)
@@ -151,18 +145,21 @@ func (ap *appendContext) lastMatchingLeaf(proto *html.Node, action rune, pos pos
 		ap.targetBody = findBody(ap.target)
 	}
 	candidates := []*html.Node{}
-	for cand := ap.target; cand != nil; cand = cand.LastChild {
-		candidates = append([]*html.Node{cand}, candidates...)
+	if action == '+' {
+		for p := range pos {
+			//fmt.Println("match", pos[p].node.Data)
+			candidates = append(candidates, ap.matchingNodes(ap.targetBody, pos[p].node, pos, action)...)
+			//	/*fmt.Printf("level %d created candidates ", p)
+			//	for _, cc := range candidates {
+			//		fmt.Printf("%v ", cc.Data)
+			//	}
+			//	fmt.Println("")*/
+		}
+	} else {
+		for cand := ap.target; cand != nil; cand = cand.LastChild {
+			candidates = append([]*html.Node{cand}, candidates...)
+		}
 	}
-	//for p := range pos {
-	//	//fmt.Println("match", pos[p].node.Data)
-	//	candidates = append(candidates, ap.matchingNodes(ap.targetBody, pos[p].node, pos, action)...)
-	//	/*fmt.Printf("level %d created candidates ", p)
-	//	for _, cc := range candidates {
-	//		fmt.Printf("%v ", cc.Data)
-	//	}
-	//	fmt.Println("")*/
-	//}
 	candidates = append(candidates, ap.targetBody) // longstop
 	/*fmt.Printf("All candidates: ")
 	for _, cc := range candidates {
@@ -214,9 +211,9 @@ func (ap *appendContext) leavesEqual(a, b *html.Node, action rune, gpa, gpaNil, 
 		if !posEqualDepth(gpaNil, gpb) {
 			return false
 		}
-        if len(gpaNil)>0 && gpaNil[0].nodesBefore < gpb[0].nodesBefore {
-            return false
-        }
+		if len(gpaNil) > 0 && gpaNil[0].nodesBefore < gpb[0].nodesBefore {
+			return false
+		}
 	}
 	return true // ap.leavesEqual(a.Parent, b.Parent, action, gpa, gpaNil, gpb)
 }

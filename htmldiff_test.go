@@ -47,7 +47,7 @@ var simpleTests = []simpleTest{
 	{[]string{"<ul><li>1</li><li>2</li><li>3</li></ul>",
 		"<ul><li>one</li><li>two</li><li>three</li></ul>",
 		"<ul><li>1</li><li><i>2</i></li><li>3</li><li>4</li></ul>"},
-		[]string{`<ul><li><span style="background-color: lightpink; text-decoration: line-through;">1</span></li><li><span style="background-color: lightpink; text-decoration: line-through;">2</span></li><li><span style="background-color: lightpink; text-decoration: line-through;">3</span></li><li><span style="background-color: palegreen; text-decoration: underline;">one</span></li><li><span style="background-color: palegreen; text-decoration: underline;">two</span></li><li><span style="background-color: palegreen; text-decoration: underline;">three</span></li></ul>`,
+		[]string{`<ul><li><span style="background-color: lightpink; text-decoration: line-through;">1</span><span style="background-color: palegreen; text-decoration: underline;">one</span></li><li><span style="background-color: lightpink; text-decoration: line-through;">2</span><span style="background-color: palegreen; text-decoration: underline;">two</span></li><li><span style="background-color: lightpink; text-decoration: line-through;">3</span><span style="background-color: palegreen; text-decoration: underline;">three</span></li></ul>`,
 			`<ul><li>1</li><li><i><span style="background-color: lightskyblue; text-decoration: overline;">2</span></i></li><li>3</li><li><span style="background-color: palegreen; text-decoration: underline;">4</span></li></ul>`}},
 
 	{[]string{doc1 + doc2 + doc3 + doc4, doc1 + doc2 + doc3 + doc4, doc1 + doc3 + doc4, doc1 + "<i>" + doc2 + "</i>" + doc3 + doc4,
