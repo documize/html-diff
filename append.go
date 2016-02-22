@@ -1,8 +1,6 @@
 package htmldiff
 
 import (
-	"fmt"
-
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
 )
@@ -19,6 +17,16 @@ type appendContext struct {
 func (ap *appendContext) append(action rune, tr treeRune) {
 	if tr.leaf == nil {
 		return
+	}
+	// return if we should not be appending this type of node
+	switch tr.leaf.Type {
+	case html.DocumentNode:
+		return
+	case html.ElementNode:
+		switch tr.leaf.DataAtom {
+		case atom.Html:
+			return
+		}
 	}
 	var text string
 	if tr.letter > 0 {
@@ -67,7 +75,8 @@ func (ap *appendContext) append0(action rune, text string, proto *html.Node, pos
 		// return // NoOp
 	}
 	if appendPoint.DataAtom != protoAncestor.DataAtom {
-		fmt.Println("BAD Append:\n", vizTree(protoAncestor, proto, nil), "To:\n", vizTree(ap.target, appendPoint, ap.amended))
+		//fmt.Println("BAD Append:\n", vizTree(protoAncestor, proto, nil), "To:\n", vizTree(ap.target, appendPoint, ap.amended))
+		return
 	}
 	newLeaf := new(html.Node)
 	copyNode(newLeaf, proto)
@@ -106,14 +115,14 @@ func (ap *appendContext) append0(action rune, text string, proto *html.Node, pos
 	}
 	appendPoint.AppendChild(newLeaf)
 	ap.amended[newLeaf] = action
-	if action != '+' {
+	/*if action != '+' {
 		// mark previously inserted parental nodes as normal
 		for apt := appendPoint; apt != nil; apt = apt.Parent {
 			if ap.amended[apt] == '+' {
 				ap.amended[apt] = '='
 			}
 		}
-	}
+	}*/
 }
 
 func (ap *appendContext) matchingNodes(tree, match *html.Node, pos posT, action rune) []*html.Node {
@@ -122,20 +131,20 @@ func (ap *appendContext) matchingNodes(tree, match *html.Node, pos posT, action 
 		//skip := 0
 		lastPos := len(pos) - 1
 		for ch := tree.FirstChild; ch != nil; ch = ch.NextSibling {
-			//if skip == pos[lastPos].nodesBefore {
+			//if skip >= pos[lastPos].nodesBefore {
+			if ch.Type == html.ElementNode {
 				ret = append(ap.matchingNodes(ch, match, pos[:lastPos], action), ret...)
+			}
 			//}
-			//if ap.amended[tree] != '-' {
-			//	skip++
+			//if ch.Type == html.ElementNode {
+			//skip++
 			//}
 		}
 	}
-	//if !(ap.amended[tree] == '+' && action != '+') { // can never add to an added node if from base
 	if nodeEqual(tree, match) {
 		//fmt.Printf("matchingNodes %#v %#v\n", tree.Data, match.Data)
 		ret = append(ret, tree)
 	}
-	//}
 	return ret
 }
 
@@ -178,6 +187,9 @@ func (ap *appendContext) lastMatchingLeaf(proto *html.Node, action rune, pos pos
 		gpaNil := getPos(can, nil)     // what we are building
 		//fmt.Println("candidate", cni, can.Data)
 		for anc := proto; anc.Parent != nil; anc = anc.Parent {
+			if anc.Type == html.ElementNode && anc.DataAtom == atom.Html {
+				break
+			}
 			//fmt.Println("comparing candidate", cni, can, anc)
 			gpb := getPos(anc, nil) // what we are adding in
 			if ap.leavesEqual(can, anc, action, gpa, gpaNil, gpb) {
@@ -186,8 +198,8 @@ func (ap *appendContext) lastMatchingLeaf(proto *html.Node, action rune, pos pos
 			}
 		}
 	}
-	//fmt.Println("Did not find candidate", proto, action, pos)
-	return nil, nil
+	//	fmt.Println("Did not find candidate", proto, action, pos)
+	return ap.targetBody, proto
 }
 
 func (ap *appendContext) leavesEqual(a, b *html.Node, action rune, gpa, gpaNil, gpb posT) bool {
@@ -196,6 +208,9 @@ func (ap *appendContext) leavesEqual(a, b *html.Node, action rune, gpa, gpaNil, 
 	}
 	if a == nil || b == nil {
 		return false
+	}
+	if a.Type != html.ElementNode || a.Type != html.ElementNode {
+		return false // they must both be element nodes to do a comparison
 	}
 	if a.DataAtom == atom.Body && b.DataAtom == atom.Body {
 		return true // body nodes are always equal

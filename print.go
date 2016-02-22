@@ -1,7 +1,11 @@
 package htmldiff
 
-import "golang.org/x/net/html"
-import "strings"
+import (
+	"fmt"
+	"strings"
+
+	"golang.org/x/net/html"
+)
 
 // vizTree provides a text visualisation of the given html.Node tree, one node per line, stopping at the target.
 func vizTree(n, target *html.Node, amended amendedT) string {
@@ -46,12 +50,18 @@ func vizTree0(n, target *html.Node, amended amendedT, l int, s string) (string, 
 	} else {
 		s += strings.Replace(n.Data, "\n", "", -1)
 	}
+	s += " ["
+	p := getPos(n, nil)
+	for _, pp := range p {
+		s += fmt.Sprintf(" %d ", pp.nodesBefore)
+	}
+	s += "]"
 	if n == target {
 		return s + " (Target)\n", true
 	}
 	s += "\n"
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
-        var found bool 
+		var found bool
 		s, found = vizTree0(c, target, amended, l+1, s)
 		if found {
 			return s, true

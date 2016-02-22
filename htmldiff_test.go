@@ -1,6 +1,7 @@
 package htmldiff_test
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"strings"
@@ -16,6 +17,7 @@ var cfg = &htmldiff.Config{
 	InsertedSpan:  []html.Attribute{{Key: "style", Val: "background-color: palegreen; text-decoration: underline;"}},
 	DeletedSpan:   []html.Attribute{{Key: "style", Val: "background-color: lightpink; text-decoration: line-through;"}},
 	FormattedSpan: []html.Attribute{{Key: "style", Val: "background-color: lightskyblue; text-decoration: overline;"}},
+	CleanTags:     []string{"documize"},
 }
 
 type simpleTest struct {
@@ -23,8 +25,8 @@ type simpleTest struct {
 }
 
 var simpleTests = []simpleTest{
-/**/
-	{[]string{"chinese中文", "chinese中文", "中文", "chinese"},
+	/**/
+	{[]string{"chinese中文", `chinese<documize type="field-start"></documize>中文`, "中文", "chinese"},
 		[]string{"chinese中文",
 			`<span style="background-color: lightpink; text-decoration: line-through;">chinese</span>中文`,
 			`chinese<span style="background-color: lightpink; text-decoration: line-through;">中文</span>`}},
@@ -60,7 +62,7 @@ var simpleTests = []simpleTest{
 
 	{[]string{bbcNews1 + bbcNews2, bbcNews1 + "<div><i>HTML-Diff-Inserted</i></div>" + bbcNews2},
 		[]string{`<div><i><span style="` + cfg.InsertedSpan[0].Val + `">HTML-Diff-Inserted</span></i></div>`}},
-/**/
+	/**/
 	{[]string{`<table border="1" style="width:100%">
   <tr>
     <td>Jack</td>
@@ -75,7 +77,7 @@ var simpleTests = []simpleTest{
 </table>`, /**/
 		`<table border="1" style="width:100%">
   <tr>
-    <td>Jack</td>
+    <td colspan="1">Jack</td>
     <td><b>and</b></td> 
     <td>Vera</td>
   </tr>
@@ -123,7 +125,7 @@ var simpleTests = []simpleTest{
     <td>and</td> 
     <td>Tweedledee</td>
   </tr>
-</table>`},
+</table>`, `<div><b><i>...and now for something completely different.</i></b></div>`},
 		[]string{ /**/ `<table border="1" style="width:100%">
   <tbody><tr>
     <td>Jack</td>
@@ -152,7 +154,7 @@ var simpleTests = []simpleTest{
     <td>and</td> 
     <td>Joan</td>
   </tr>
-</tbody></table>`,/**/
+</tbody></table>`, /**/
 			`<table border="1" style="width:100%">
   <tbody><tr>
     <td>Jack</td>
@@ -174,7 +176,22 @@ var simpleTests = []simpleTest{
     </span><td><span style="background-color: palegreen; text-decoration: underline;">and</span></td><span style="background-color: palegreen; text-decoration: underline;"> 
     </span><td><span style="background-color: palegreen; text-decoration: underline;">Tweedledee</span></td>
   </tr>
-</tbody></table>`}},
+</tbody></table>`,
+			`<table border="1" style="width:100%"><span style="background-color: lightpink; text-decoration: line-through;">
+  </span><tbody><tr><span style="background-color: lightpink; text-decoration: line-through;">
+    </span><td><span style="background-color: lightpink; text-decoration: line-through;">Jack</span></td><span style="background-color: lightpink; text-decoration: line-through;">
+    </span><td><span style="background-color: lightpink; text-decoration: line-through;">and</span></td><span style="background-color: lightpink; text-decoration: line-through;"> 
+    </span><td><span style="background-color: lightpink; text-decoration: line-through;">Jill</span></td><span style="background-color: lightpink; text-decoration: line-through;">
+  </span></tr><span style="background-color: lightpink; text-decoration: line-through;">
+  </span><tr><span style="background-color: lightpink; text-decoration: line-through;">
+    </span><td><span style="background-color: lightpink; text-decoration: line-through;">Derby</span></td><span style="background-color: lightpink; text-decoration: line-through;">
+    </span><td><span style="background-color: lightpink; text-decoration: line-through;">and</span></td><span style="background-color: lightpink; text-decoration: line-through;"> 
+    </span><td><span style="background-color: lightpink; text-decoration: line-through;">Joan</span></td><span style="background-color: lightpink; text-decoration: line-through;">
+  </span></tr><span style="background-color: lightpink; text-decoration: line-through;">
+</span></tbody></table><div><b><i><span style="background-color: palegreen; text-decoration: underline;">...and now for something completely different.</span></i></b></div>`}},
+
+	{[]string{"", `<ul><li>A</li><li>B</li><li>C</li></ul>`},
+		[]string{`<ul><li><span style="background-color: palegreen; text-decoration: underline;">A</span></li><li><span style="background-color: palegreen; text-decoration: underline;">B</span></li><li><span style="background-color: palegreen; text-decoration: underline;">C</span></li></ul>`}},
 }
 
 func TestSimple(t *testing.T) {
@@ -202,4 +219,23 @@ func TestSimple(t *testing.T) {
 		}
 	}
 
+}
+
+func TestQuick(t *testing.T) {
+	in := `<p style="">Document conformance is purely syntactic; it involves only Items&#160;1 and&#160;2 in &#167;<documize type="field-start"></documize>2.3<documize type="field-end"></documize> above.</p><p style="">A conforming document shall conform to the schema (Item&#160;1) and any additional syntax constraints (Item&#160;2).</p><p style="">The document character set shall conform to the Unicode Standard and ISO/IEC 10646-1, with either the UTF-8 or UTF-16 encoding form, as required by the XML&#160;1.0 standard.</p><p style="">Any XML element or attribute not explicitly included in this Standard shall use the extensibility mechanisms described by Parts 4 and 5 of this Standard.</p>`
+
+	doc, err := html.Parse(strings.NewReader(in))
+	if err != nil {
+		t.Error(err)
+		t.Fatal()
+	}
+	var buf bytes.Buffer
+	err = html.Render(&buf, doc)
+	if err != nil {
+		t.Error(err)
+		t.Fatal()
+	}
+	if buf.String() != `<html><head></head><body><p style="">Document conformance is purely syntactic; it involves only Items 1 and 2 in §<documize type="field-start"></documize>2.3<documize type="field-end"></documize> above.</p><p style="">A conforming document shall conform to the schema (Item 1) and any additional syntax constraints (Item 2).</p><p style="">The document character set shall conform to the Unicode Standard and ISO/IEC 10646-1, with either the UTF-8 or UTF-16 encoding form, as required by the XML 1.0 standard.</p><p style="">Any XML element or attribute not explicitly included in this Standard shall use the extensibility mechanisms described by Parts 4 and 5 of this Standard.</p></body></html>` {
+		t.Error("wrong result:", buf.String())
+	}
 }

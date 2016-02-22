@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/documize/html-diff/diff"
@@ -16,11 +17,12 @@ import (
 type Config struct {
 	Granularity                              int // TODO
 	InsertedSpan, DeletedSpan, FormattedSpan []html.Attribute
+	CleanTags                                []string
 }
 
 type posTT struct {
 	nodesBefore int
-	node        *html.Node
+	 node        *html.Node
 }
 
 type posT []posTT
@@ -41,12 +43,14 @@ func getPos(n *html.Node, m amendedT) posT {
 	for root := n; root.Parent != nil && root.DataAtom != atom.Body; root = root.Parent {
 		var before int
 		for sib := root.Parent.FirstChild; sib != root; sib = sib.NextSibling {
-			switch m[sib] {
-			case '+':
-				//fmt.Println("getPos skipped for ", sib, m[sib])
-			default:
-				before++
-			}
+			//if sib.Type == html.ElementNode {
+				switch m[sib] {
+				case '+':
+					//fmt.Println("getPos skipped for ", sib, m[sib])
+				default:
+					before++
+				}
+			//}
 		}
 
 		ret = append(ret, posTT{before, root})
@@ -213,52 +217,114 @@ func granular(gran int, dd diffData, changes []diff.Change) []diff.Change {
 	return ret
 }
 
+func delAttr(attr []html.Attribute, ai int) (ret []html.Attribute) {
+	if len(attr) <= 1 {
+		return nil
+	}
+	return append(attr[:ai], attr[ai+1:]...)
+}
+
+// clean() obviously removes empty styles and any CleanTags specified,
+// but less obviously (as a side-effect of Parse/Render) makes all the character handling (for example "&#160;" as utf-8) the same.
+func (c *Config) clean(raw string) (io.Reader, error) {
+	doc, err := html.Parse(strings.NewReader(raw))
+	if err != nil {
+		return nil, err
+	}
+	var f func(*html.Node)
+	f = func(n *html.Node) {
+		if n.Type == html.ElementNode {
+			for ai := 0; ai < len(n.Attr); ai++ {
+				a := n.Attr[ai]
+				switch {
+				case strings.ToLower(a.Key) == "style" &&
+					strings.TrimSpace(a.Val) == "":
+					n.Attr = delAttr(n.Attr, ai)
+					ai--
+				case n.DataAtom == atom.Td &&
+					strings.ToLower(a.Key) == "colspan" &&
+					strings.TrimSpace(a.Val) == "1":
+					n.Attr = delAttr(n.Attr, ai)
+					ai--
+				}
+			}
+			//if len(n.Attr) > 0 {
+			//	fmt.Println("kept", n.Attr)
+			//}
+		}
+		for ch := n.FirstChild; ch != nil; ch = ch.NextSibling {
+			if ch.Type == html.ElementNode {
+				for _, rr := range c.CleanTags {
+					if rr == ch.Data {
+						//fmt.Println("delete child", ch)
+						n.RemoveChild(ch)
+						goto removedChild
+					}
+				}
+			}
+			f(ch)
+		removedChild:
+		}
+	}
+	f(doc)
+	var buf bytes.Buffer
+	err = html.Render(&buf, doc)
+	return &buf, err
+}
+
 // Find all the differences in the versions of the HTML snippits, versions[0] is the original, all other versions are the edits to be compared.
 // The resulting merged HTML snippits are as many as there are edits to compare.
-func (c *Config) Find(versions []string) ([]string, error) {
-	if len(versions) < 2 {
+func (c *Config) Find(versionsRaw []string) ([]string, error) {
+	if len(versionsRaw) < 2 {
 		return nil, errors.New("there must be at least two versions to diff, the 0th element is the base")
 	}
+	versions := make([]string, len(versionsRaw))
+	parallelErrors := make(chan error, len(versions))
 	sourceTrees := make([]*html.Node, len(versions))
 	sourceTreeRunes := make([]*[]treeRune, len(versions))
 	firstLeaves := make([]int, len(versions))
-	parallelErrors := make(chan error, len(versions))
-	for v, vv := range versions {
-		go func(v int, vv string) {
-			var err error
-			sourceTrees[v], err = html.Parse(strings.NewReader(vv))
+	for v, vvr := range versionsRaw {
+		go func(v int, vvr string) {
+			vv, err := c.clean(vvr)
 			if err == nil {
-				//fmt.Println(VizTree(sourceTrees[v]))
-				tr := make([]treeRune, 0, 1024)
-				sourceTreeRunes[v] = &tr
-				renderTreeRunes(sourceTrees[v], &tr)
-				//for x, y := range tr {
-				//	fmt.Printf("Tree Runes rendered: %d %s %#v %#v\n", x, string(y.letter), y.leaf.Type, y.pos)
-				//}
-				leaf1, ok := firstLeaf(findBody(sourceTrees[v]))
-				//fmt.Printf("First Leaf: %#v %v\n", leaf1, ok)
-				if leaf1 == nil || !ok {
-					firstLeaves[v] = 0 // probably wrong
-					//fmt.Printf("First Leaf is nil or !ok: %d %v %v\n", v, leaf1, ok)
-				} else {
-					for x, y := range tr {
-						//	fmt.Printf("Tree Runes: %d %s %#v\n", x, string(y.letter), y.leaf.Type)
-						if y.leaf == leaf1 {
-							firstLeaves[v] = x
-							//fmt.Printf("First Leaf: %d %d %#v\n", v, x, y.leaf)
-							break
+				sourceTrees[v], err = html.Parse(vv)
+				if err == nil {
+					//fmt.Println(VizTree(sourceTrees[v]))
+					tr := make([]treeRune, 0, 1024)
+					sourceTreeRunes[v] = &tr
+					renderTreeRunes(sourceTrees[v], &tr)
+					//for x, y := range tr {
+					//	fmt.Printf("Tree Runes rendered: %d %s %#v %#v\n", x, string(y.letter), y.leaf.Type, y.pos)
+					//}
+					leaf1, ok := firstLeaf(findBody(sourceTrees[v]))
+					//fmt.Printf("First Leaf: %#v %v\n", leaf1, ok)
+					if leaf1 == nil || !ok {
+						firstLeaves[v] = 0 // probably wrong
+						//fmt.Printf("First Leaf is nil or !ok: %d %v %v\n", v, leaf1, ok)
+					} else {
+						for x, y := range tr {
+							//	fmt.Printf("Tree Runes: %d %s %#v\n", x, string(y.letter), y.leaf.Type)
+							if y.leaf == leaf1 {
+								firstLeaves[v] = x
+								//fmt.Printf("First Leaf: %d %d %#v\n", v, x, y.leaf)
+								break
+							}
 						}
 					}
 				}
 			}
 			parallelErrors <- err
-		}(v, vv)
+		}(v, vvr)
 	}
 	for _ = range versions {
 		if err := <-parallelErrors; err != nil {
 			return nil, err
 		}
 	}
+    //for v := range versions {
+      //  fmt.Println("Tree:",v,vizTree(sourceTrees[v],nil,nil))
+    //}
+    
 	// now all the input trees are buit, we can do the merge
 	mergedHTMLs := make([]string, len(versions)-1)
 
@@ -356,7 +422,6 @@ func (c *Config) walkChanges(changes []diff.Change, ap, bp *[]treeRune, aIdx, bI
 	return mergedTree, nil
 }
 
-
 func copyNode(to, from *html.Node) {
 	to.Attr = from.Attr
 	to.Data = from.Data
@@ -379,11 +444,10 @@ func nodeEqual(base, comp *html.Node) bool {
 	return true
 }
 
-// findBody finds the body HTML node if it exists in the tree. Required to bypass the page title text.
+// findBody finds the first body HTML node if it exists in the tree. Required to bypass the page title text.
 func findBody(n *html.Node) *html.Node {
-	var found *html.Node
-	if n.DataAtom == atom.Body {
-		found = n
+	if n.Type == html.ElementNode && n.DataAtom == atom.Body {
+		return n
 	}
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
 		r := findBody(c)
@@ -391,7 +455,7 @@ func findBody(n *html.Node) *html.Node {
 			return r
 		}
 	}
-	return found
+	return nil
 }
 
 // find the first leaf in the tree that is a text node
