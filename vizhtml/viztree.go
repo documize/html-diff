@@ -1,36 +1,33 @@
-package htmldiff
+package vizhtml
 
 import (
-	"fmt"
 	"strings"
 
 	"golang.org/x/net/html"
 )
 
-// vizTree provides a text visualisation of the given html.Node tree, one node per line, stopping at the target.
-func vizTree(n, target *html.Node, amended amendedT) string {
-	r, _ := vizTree0(n, target, amended, 0, "")
+// Tree provides a text visualisation of the given html.Node tree, one node per line, stopping at the target.
+// It is intended for debugging.
+func Tree(n, target *html.Node) string {
+	r, _ := vizTree0(n, target, 0, "")
 	return r
 }
 
 // nodeLevel returns the prefix to show the depth of the node
-func nodeLevel(l int, amend rune) (s string) {
-	if amend == 0 {
-		amend = '='
-	}
+func nodeLevel(l int) (s string) {
 	for i := 0; i < l; i++ {
-		s += string(amend)
+		s += "-"
 	}
 	s += ">"
 	return s
 }
 
 // vizTree0 is the recursive node tree walker.
-func vizTree0(n, target *html.Node, amended amendedT, l int, s string) (string, bool) {
+func vizTree0(n, target *html.Node, l int, s string) (string, bool) {
 	if n == nil {
 		return s, true
 	}
-	s += nodeLevel(l, amended[n])
+	s += nodeLevel(l)
 	switch n.Type {
 	case html.ErrorNode:
 		s += " Error: "
@@ -50,19 +47,13 @@ func vizTree0(n, target *html.Node, amended amendedT, l int, s string) (string, 
 	} else {
 		s += strings.Replace(n.Data, "\n", "", -1)
 	}
-	s += " ["
-	p := getPos(n, nil)
-	for _, pp := range p {
-		s += fmt.Sprintf(" %d ", pp.nodesBefore)
-	}
-	s += "]"
 	if n == target {
 		return s + " (Target)\n", true
 	}
 	s += "\n"
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
 		var found bool
-		s, found = vizTree0(c, target, amended, l+1, s)
+		s, found = vizTree0(c, target, l+1, s)
 		if found {
 			return s, true
 		}

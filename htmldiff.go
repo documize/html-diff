@@ -3,7 +3,6 @@ package htmldiff
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 	"strings"
 
@@ -13,16 +12,16 @@ import (
 	"golang.org/x/net/html/atom"
 )
 
-// Config describes the way that Find() works.
+// Config describes the way that HTMLdiff() works.
 type Config struct {
-	Granularity                              int // TODO
-	InsertedSpan, DeletedSpan, FormattedSpan []html.Attribute
-	CleanTags                                []string
+	Granularity                             int              // how many letters to put together for a change, if possible
+	InsertedSpan, DeletedSpan, ReplacedSpan []html.Attribute // the attributes for the span tags wrapping changes
+	CleanTags                               []string         // HTML tags to clean from the input
 }
 
 type posTT struct {
 	nodesBefore int
-	 node        *html.Node
+	node        *html.Node
 }
 
 type posT []posTT
@@ -33,9 +32,7 @@ type treeRune struct {
 	pos    posT
 }
 
-type amendedT map[*html.Node]rune
-
-func getPos(n *html.Node, m amendedT) posT {
+func getPos(n *html.Node) posT {
 	if n == nil {
 		return nil
 	}
@@ -43,14 +40,9 @@ func getPos(n *html.Node, m amendedT) posT {
 	for root := n; root.Parent != nil && root.DataAtom != atom.Body; root = root.Parent {
 		var before int
 		for sib := root.Parent.FirstChild; sib != root; sib = sib.NextSibling {
-			//if sib.Type == html.ElementNode {
-				switch m[sib] {
-				case '+':
-					//fmt.Println("getPos skipped for ", sib, m[sib])
-				default:
-					before++
-				}
-			//}
+			if sib.Type == html.ElementNode {
+				before++
+			}
 		}
 
 		ret = append(ret, posTT{before, root})
@@ -74,26 +66,6 @@ func posEqual(a, b posT) bool {
 	return true
 }
 
-func posSoftMatch(a, b posT) bool {
-	if !posEqualDepth(a, b) {
-		return false
-	}
-	for i, aa := range a {
-		bb := b[i]
-		if aa.nodesBefore > bb.nodesBefore {
-			return false
-		}
-	}
-	return true
-}
-
-func (tr treeRune) String() string {
-	if tr.leaf.Type == html.TextNode {
-		return fmt.Sprintf("%s %v", string(tr.letter), tr.pos)
-	}
-	return fmt.Sprintf("<%s> %v", tr.leaf.Data, tr.pos)
-}
-
 type diffData struct {
 	a, b *[]treeRune
 }
@@ -105,7 +77,7 @@ func (dd diffData) Equal(i, j int) bool {
 	if ii.letter != jj.letter && ii.letter > 0 && jj.letter > 0 {
 		return false
 	}
-	if !posEqualDepth(ii.pos, jj.pos) {
+	if !posEqual(ii.pos, jj.pos) {
 		return false
 	}
 	return nodeTreeEqual(ii.leaf, jj.leaf)
@@ -148,14 +120,14 @@ func nodeEqualExText(base, comp *html.Node) bool {
 	if !attrEqual(base, comp) {
 		return false
 	}
-	//if comp.Data != base.Data && base.Type != html.TextNode {
-	//	return false // only test for the same data if not a text node
-	//}
+	if comp.Data != base.Data && base.Type != html.TextNode {
+		return false // only test for the same data if not a text node
+	}
 	return true
 }
 
 func renderTreeRunes(n *html.Node, tr *[]treeRune) {
-	p := getPos(n, nil)
+	p := getPos(n)
 	if n.FirstChild == nil { // it is a leaf node
 		switch n.Type {
 		case html.TextNode:
@@ -170,50 +142,40 @@ func renderTreeRunes(n *html.Node, tr *[]treeRune) {
 			*tr = append(*tr, treeRune{leaf: n, letter: 0, pos: p})
 		}
 	} else {
-		//*tr = append(*tr, treeRune{leaf: n, letter: 0, pos: p})
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
 			renderTreeRunes(c, tr)
 		}
-		//*tr = append(*tr, treeRune{})
 	}
 }
 
-// THIS FUNCITON TODO -- should only concatanate changes for text nodes
+// wrapper for diff.Granular() -- should only concatanate changes for similar text nodes
 func granular(gran int, dd diffData, changes []diff.Change) []diff.Change {
 	ret := make([]diff.Change, 0, len(changes))
-	/*
-		startSame := 0
-		changeCount := 0
-		lastAleaf, lastBleaf := (*dd.a)[0].leaf, (*dd.b)[0].leaf
-	*/
+	startSame := 0
+	changeCount := 0
+	lastAleaf, lastBleaf := (*dd.a)[0].leaf, (*dd.b)[0].leaf
 	for c, cc := range changes {
-		/*
-			if cc.A < len(*dd.a) && cc.B < len(*dd.b) &&
-				lastAleaf.Type == html.TextNode && lastBleaf.Type == html.TextNode &&
-				(*dd.a)[cc.A].leaf == lastAleaf && (*dd.b)[cc.B].leaf == lastBleaf {
-				// do nothing yet, queue it up until there is a difference
-				changeCount++
-			} else { // no match
-				if changeCount > 0 { // flush
-					ret = append(ret, diff.Granular(gran, changes[startSame:startSame+changeCount])...)
-				}
-		*/
-		ret = append(ret, cc)
-		_ = c
-		/*
-				startSame = c
-				changeCount = 0
-				if cc.A < len(*dd.a) && cc.B < len(*dd.b) {
-					lastAleaf, lastBleaf = (*dd.a)[cc.A].leaf, (*dd.b)[cc.B].leaf
-				}
+		if cc.A < len(*dd.a) && cc.B < len(*dd.b) &&
+			lastAleaf.Type == html.TextNode && lastBleaf.Type == html.TextNode &&
+			(*dd.a)[cc.A].leaf == lastAleaf && (*dd.b)[cc.B].leaf == lastBleaf &&
+			nodeEqualExText(lastAleaf, lastBleaf) { // TODO is this last constraint required?
+			// do nothing yet, queue it up until there is a difference
+			changeCount++
+		} else { // no match
+			if changeCount > 0 { // flush
+				ret = append(ret, diff.Granular(gran, changes[startSame:startSame+changeCount])...)
 			}
-		*/
-	}
-	/*
-		if changeCount > 0 { // flush
-			ret = append(ret, diff.Granular(gran, changes[startSame:])...)
+			ret = append(ret, cc)
+			startSame = c + 1 // the one after this
+			changeCount = 0
+			if cc.A < len(*dd.a) && cc.B < len(*dd.b) {
+				lastAleaf, lastBleaf = (*dd.a)[cc.A].leaf, (*dd.b)[cc.B].leaf
+			}
 		}
-	*/
+	}
+	if changeCount > 0 { // flush
+		ret = append(ret, diff.Granular(gran, changes[startSame:])...)
+	}
 	return ret
 }
 
@@ -224,7 +186,7 @@ func delAttr(attr []html.Attribute, ai int) (ret []html.Attribute) {
 	return append(attr[:ai], attr[ai+1:]...)
 }
 
-// clean() obviously removes empty styles and any CleanTags specified,
+// clean() obviously normalises styles/colspan and removes any CleanTags specified, along with newlines;
 // but less obviously (as a side-effect of Parse/Render) makes all the character handling (for example "&#160;" as utf-8) the same.
 func (c *Config) clean(raw string) (io.Reader, error) {
 	doc, err := html.Parse(strings.NewReader(raw))
@@ -237,10 +199,16 @@ func (c *Config) clean(raw string) (io.Reader, error) {
 			for ai := 0; ai < len(n.Attr); ai++ {
 				a := n.Attr[ai]
 				switch {
-				case strings.ToLower(a.Key) == "style" &&
-					strings.TrimSpace(a.Val) == "":
-					n.Attr = delAttr(n.Attr, ai)
-					ai--
+				case strings.ToLower(a.Key) == "style":
+					if strings.TrimSpace(a.Val) == "" {
+						n.Attr = delAttr(n.Attr, ai)
+						ai--
+					} else {
+						n.Attr[ai].Val = strings.Replace(a.Val, " ", "", -1)
+						if !strings.HasSuffix(n.Attr[ai].Val, ";") {
+							n.Attr[ai].Val += ";"
+						}
+					}
 				case n.DataAtom == atom.Td &&
 					strings.ToLower(a.Key) == "colspan" &&
 					strings.TrimSpace(a.Val) == "1":
@@ -248,22 +216,24 @@ func (c *Config) clean(raw string) (io.Reader, error) {
 					ai--
 				}
 			}
-			//if len(n.Attr) > 0 {
-			//	fmt.Println("kept", n.Attr)
-			//}
 		}
+	searchChildren:
 		for ch := n.FirstChild; ch != nil; ch = ch.NextSibling {
-			if ch.Type == html.ElementNode {
+			switch ch.Type {
+			case html.ElementNode:
 				for _, rr := range c.CleanTags {
 					if rr == ch.Data {
-						//fmt.Println("delete child", ch)
 						n.RemoveChild(ch)
-						goto removedChild
+						goto searchChildren
 					}
+				}
+			case html.TextNode:
+				if ch.Data == "\n" && ch.Parent.DataAtom != atom.Pre {
+					n.RemoveChild(ch)
+					goto searchChildren
 				}
 			}
 			f(ch)
-		removedChild:
 		}
 	}
 	f(doc)
@@ -272,9 +242,10 @@ func (c *Config) clean(raw string) (io.Reader, error) {
 	return &buf, err
 }
 
-// Find all the differences in the versions of the HTML snippits, versions[0] is the original, all other versions are the edits to be compared.
+// HTMLdiff finds all the differences in the versions of HTML snippits,
+// versionsRaw[0] is the original, all other versions are the edits to be compared.
 // The resulting merged HTML snippits are as many as there are edits to compare.
-func (c *Config) Find(versionsRaw []string) ([]string, error) {
+func (c *Config) HTMLdiff(versionsRaw []string) ([]string, error) {
 	if len(versionsRaw) < 2 {
 		return nil, errors.New("there must be at least two versions to diff, the 0th element is the base")
 	}
@@ -289,24 +260,16 @@ func (c *Config) Find(versionsRaw []string) ([]string, error) {
 			if err == nil {
 				sourceTrees[v], err = html.Parse(vv)
 				if err == nil {
-					//fmt.Println(VizTree(sourceTrees[v]))
 					tr := make([]treeRune, 0, 1024)
 					sourceTreeRunes[v] = &tr
 					renderTreeRunes(sourceTrees[v], &tr)
-					//for x, y := range tr {
-					//	fmt.Printf("Tree Runes rendered: %d %s %#v %#v\n", x, string(y.letter), y.leaf.Type, y.pos)
-					//}
 					leaf1, ok := firstLeaf(findBody(sourceTrees[v]))
-					//fmt.Printf("First Leaf: %#v %v\n", leaf1, ok)
 					if leaf1 == nil || !ok {
 						firstLeaves[v] = 0 // probably wrong
-						//fmt.Printf("First Leaf is nil or !ok: %d %v %v\n", v, leaf1, ok)
 					} else {
 						for x, y := range tr {
-							//	fmt.Printf("Tree Runes: %d %s %#v\n", x, string(y.letter), y.leaf.Type)
 							if y.leaf == leaf1 {
 								firstLeaves[v] = x
-								//fmt.Printf("First Leaf: %d %d %#v\n", v, x, y.leaf)
 								break
 							}
 						}
@@ -321,10 +284,7 @@ func (c *Config) Find(versionsRaw []string) ([]string, error) {
 			return nil, err
 		}
 	}
-    //for v := range versions {
-      //  fmt.Println("Tree:",v,vizTree(sourceTrees[v],nil,nil))
-    //}
-    
+
 	// now all the input trees are buit, we can do the merge
 	mergedHTMLs := make([]string, len(versions)-1)
 
@@ -332,22 +292,12 @@ func (c *Config) Find(versionsRaw []string) ([]string, error) {
 		go func(m int) {
 			dd := diffData{a: sourceTreeRunes[0], b: sourceTreeRunes[m+1]}
 			changes := diff.Diff(len(*sourceTreeRunes[0]), len(*sourceTreeRunes[m+1]), dd)
-			//fmt.Printf("Changes: %d %#v\n", m, changes)
-			/* POSSIBLE FUTURE ENHANCEMENT, BUT HEADER MUST BE REMOVED FIRST
-			if len(changes) == 0 { // no changes, so just return the original version
-				mergedHTMLs[m] = versions[0]
-				parallelErrors <- nil
-				return
-			}
-			*/
 			changes = granular(c.Granularity, dd, changes)
 			mergedTree, err := c.walkChanges(changes, sourceTreeRunes[0], sourceTreeRunes[m+1], firstLeaves[0], firstLeaves[m+1])
 			if err != nil {
 				parallelErrors <- err
 				return
 			}
-			//fmt.Printf("SourceTree:\n%s\n", VizTree(sourceTrees[0]))
-			//fmt.Printf("MergedTree %d:\n%s\n", m, VizTree(mergedTree))
 			var mergedHTMLbuff bytes.Buffer
 			err = html.Render(&mergedHTMLbuff, mergedTree)
 			if err != nil {
@@ -381,9 +331,8 @@ func (c *Config) walkChanges(changes []diff.Change, ap, bp *[]treeRune, aIdx, bI
 	}
 	a := *ap
 	b := *bp
-	ctx := &appendContext{c: c, target: mergedTree, amended: make(amendedT)}
-	for _ /*i*/, change := range changes {
-		//fmt.Printf("Change %d %#v\n", i, change)
+	ctx := &appendContext{c: c, target: mergedTree}
+	for _, change := range changes {
 		for aIdx < change.A && bIdx < change.B {
 			ctx.append('=', a[aIdx])
 			aIdx++
@@ -419,6 +368,7 @@ func (c *Config) walkChanges(changes []diff.Change, ap, bp *[]treeRune, aIdx, bI
 		bIdx++
 	}
 	ctx.flush()
+	ctx.sortAndWrite()
 	return mergedTree, nil
 }
 

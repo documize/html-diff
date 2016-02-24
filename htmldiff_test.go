@@ -13,11 +13,11 @@ import (
 )
 
 var cfg = &htmldiff.Config{
-	Granularity:   5,
-	InsertedSpan:  []html.Attribute{{Key: "style", Val: "background-color: palegreen; text-decoration: underline;"}},
-	DeletedSpan:   []html.Attribute{{Key: "style", Val: "background-color: lightpink; text-decoration: line-through;"}},
-	FormattedSpan: []html.Attribute{{Key: "style", Val: "background-color: lightskyblue; text-decoration: overline;"}},
-	CleanTags:     []string{"documize"},
+	Granularity:  6,
+	InsertedSpan: []html.Attribute{{Key: "style", Val: "background-color: palegreen; text-decoration: underline;"}},
+	DeletedSpan:  []html.Attribute{{Key: "style", Val: "background-color: lightpink; text-decoration: line-through;"}},
+	ReplacedSpan: []html.Attribute{{Key: "style", Val: "background-color: lightskyblue; text-decoration: overline;"}},
+	CleanTags:    []string{"documize"},
 }
 
 type simpleTest struct {
@@ -25,7 +25,7 @@ type simpleTest struct {
 }
 
 var simpleTests = []simpleTest{
-	/**/
+
 	{[]string{"chinese中文", `chinese<documize type="field-start"></documize>中文`, "中文", "chinese"},
 		[]string{"chinese中文",
 			`<span style="background-color: lightpink; text-decoration: line-through;">chinese</span>中文`,
@@ -35,11 +35,11 @@ var simpleTests = []simpleTest{
 		[]string{`<span style="background-color: lightpink; text-decoration: line-through;">hE</span><span style="background-color: palegreen; text-decoration: underline;">Hel</span>l<span style="background-color: lightpink; text-decoration: line-through;">L</span>o is that <span style="background-color: lightpink; text-decoration: line-through;">d</span><span style="background-color: palegreen; text-decoration: underline;">D</span>ocumize<span style="background-color: lightpink; text-decoration: line-through;">!</span><span style="background-color: palegreen; text-decoration: underline;">?</span>`}},
 
 	{[]string{"abc", "<i>abc</i>", "<h1><i>abc</i></h1>"},
-		[]string{`<i><span style="` + cfg.FormattedSpan[0].Val + `">abc</span></i>`,
-			`<h1><i><span style="` + cfg.FormattedSpan[0].Val + `">abc</span></i></h1>`}},
+		[]string{`<i><span style="` + cfg.ReplacedSpan[0].Val + `">abc</span></i>`,
+			`<h1><i><span style="` + cfg.ReplacedSpan[0].Val + `">abc</span></i></h1>`}},
 
 	{[]string{"<p><span>def</span></p>", "def"},
-		[]string{`<span style="` + cfg.FormattedSpan[0].Val + `">def</span>`}},
+		[]string{`<span style="` + cfg.ReplacedSpan[0].Val + `">def</span>`}},
 
 	{[]string{`Documize Logo:<img src="http://documize.com/img/documize-logo.png" alt="Documize">`,
 		"Documize Logo:", `<img src="http://documize.com/img/documize-logo.png" alt="Documize">`},
@@ -62,7 +62,7 @@ var simpleTests = []simpleTest{
 
 	{[]string{bbcNews1 + bbcNews2, bbcNews1 + "<div><i>HTML-Diff-Inserted</i></div>" + bbcNews2},
 		[]string{`<div><i><span style="` + cfg.InsertedSpan[0].Val + `">HTML-Diff-Inserted</span></i></div>`}},
-	/**/
+
 	{[]string{`<table border="1" style="width:100%">
   <tr>
     <td>Jack</td>
@@ -74,7 +74,7 @@ var simpleTests = []simpleTest{
     <td>and</td> 
     <td>Joan</td>
   </tr>
-</table>`, /**/
+</table>`,
 		`<table border="1" style="width:100%">
   <tr>
     <td colspan="1">Jack</td>
@@ -103,7 +103,7 @@ var simpleTests = []simpleTest{
     <td>and</td> 
     <td>Joan</td>
   </tr>
-</table>`, /**/
+</table>`,
 		`<table border="1" style="width:100%">
   <tr>
     <td>Jack</td>
@@ -126,7 +126,7 @@ var simpleTests = []simpleTest{
     <td>Tweedledee</td>
   </tr>
 </table>`, `<div><b><i>...and now for something completely different.</i></b></div>`},
-		[]string{ /**/ `<table border="1" style="width:100%">
+		[]string{`<table border="1" style="width:100%;">
   <tbody><tr>
     <td>Jack</td>
     <td><b><span style="background-color: lightskyblue; text-decoration: overline;">and</span></b></td> 
@@ -136,68 +136,76 @@ var simpleTests = []simpleTest{
     <td>Derby</td>
     <td><span style="background-color: lightpink; text-decoration: line-through;">and</span><i><span style="background-color: palegreen; text-decoration: underline;">locomotive</span></i></td> 
     <td><span style="background-color: lightpink; text-decoration: line-through;">J</span><span style="background-color: palegreen; text-decoration: underline;">w</span>o<span style="background-color: lightpink; text-decoration: line-through;">an</span><span style="background-color: palegreen; text-decoration: underline;">rks</span></td>
-  </tr>
-</tbody></table>`,
-			`<table border="1" style="width:100%">
+  </tr></tbody></table>`,
+			`<table border="1" style="width:100%;">
   <tbody><tr>
     <td>Jack</td>
     <td>and</td> 
     <td>Jill</td>
   </tr>
   <tr>
-    <td><span style="background-color: palegreen; text-decoration: underline;">Samson</span></td><span style="background-color: palegreen; text-decoration: underline;">
-    </span><td><span style="background-color: palegreen; text-decoration: underline;">and</span></td><span style="background-color: palegreen; text-decoration: underline;"> 
-    </span><td><span style="background-color: palegreen; text-decoration: underline;">Delilah</span></td><span style="background-color: palegreen; text-decoration: underline;">
-  </span></tr><span style="background-color: palegreen; text-decoration: underline;">
-  </span><tr><span style="background-color: palegreen; text-decoration: underline;">
-    </span><td>Derby</td>
+    <td><span style="background-color: lightpink; text-decoration: line-through;">Derby</span><span style="background-color: palegreen; text-decoration: underline;">Samson</span></td>
     <td>and</td> 
-    <td>Joan</td>
-  </tr>
-</tbody></table>`, /**/
-			`<table border="1" style="width:100%">
+    <td><span style="background-color: lightpink; text-decoration: line-through;">Jo</span><span style="background-color: palegreen; text-decoration: underline;">Delil</span>a<span style="background-color: lightpink; text-decoration: line-through;">n</span><span style="background-color: palegreen; text-decoration: underline;">h</span></td>
+  </tr><span style="background-color: palegreen; text-decoration: underline;">
+  </span><tr><span style="background-color: palegreen; text-decoration: underline;">
+    </span><td><span style="background-color: palegreen; text-decoration: underline;">Derby</span></td><span style="background-color: palegreen; text-decoration: underline;">
+    </span><td><span style="background-color: palegreen; text-decoration: underline;">and</span></td><span style="background-color: palegreen; text-decoration: underline;"> 
+    </span><td><span style="background-color: palegreen; text-decoration: underline;">Joan</span></td><span style="background-color: palegreen; text-decoration: underline;">
+  </span></tr></tbody></table>`,
+			`<table border="1" style="width:100%;">
   <tbody><tr>
     <td>Jack</td>
     <td>and</td> 
     <td>Jill</td>
   </tr>
   <tr>
-    <td><span style="background-color: palegreen; text-decoration: underline;">Samson</span></td><span style="background-color: palegreen; text-decoration: underline;">
-    </span><td><span style="background-color: palegreen; text-decoration: underline;">and</span></td><span style="background-color: palegreen; text-decoration: underline;"> 
-    </span><td>De<span style="background-color: palegreen; text-decoration: underline;">lilah</span></td><span style="background-color: palegreen; text-decoration: underline;">
-  </span></tr><span style="background-color: palegreen; text-decoration: underline;">
-  </span><tr><span style="background-color: palegreen; text-decoration: underline;">
-    </span><td><span style="background-color: palegreen; text-decoration: underline;">De</span>rby</td>
+    <td><span style="background-color: lightpink; text-decoration: line-through;">Derby</span><span style="background-color: palegreen; text-decoration: underline;">Samson</span></td>
     <td>and</td> 
-    <td>Joan</td><span style="background-color: palegreen; text-decoration: underline;">
+    <td><span style="background-color: lightpink; text-decoration: line-through;">Jo</span><span style="background-color: palegreen; text-decoration: underline;">Delil</span>a<span style="background-color: lightpink; text-decoration: line-through;">n</span><span style="background-color: palegreen; text-decoration: underline;">h</span></td>
+  </tr><span style="background-color: palegreen; text-decoration: underline;">
+  </span><tr><span style="background-color: palegreen; text-decoration: underline;">
+    </span><td><span style="background-color: palegreen; text-decoration: underline;">Derby</span></td><span style="background-color: palegreen; text-decoration: underline;">
+    </span><td><span style="background-color: palegreen; text-decoration: underline;">and</span></td><span style="background-color: palegreen; text-decoration: underline;"> 
+    </span><td><span style="background-color: palegreen; text-decoration: underline;">Joan</span></td><span style="background-color: palegreen; text-decoration: underline;">
   </span></tr><span style="background-color: palegreen; text-decoration: underline;">
   </span><tr><span style="background-color: palegreen; text-decoration: underline;">
     </span><td><span style="background-color: palegreen; text-decoration: underline;">Tweedledum</span></td><span style="background-color: palegreen; text-decoration: underline;">
     </span><td><span style="background-color: palegreen; text-decoration: underline;">and</span></td><span style="background-color: palegreen; text-decoration: underline;"> 
-    </span><td><span style="background-color: palegreen; text-decoration: underline;">Tweedledee</span></td>
-  </tr>
-</tbody></table>`,
-			`<table border="1" style="width:100%"><span style="background-color: lightpink; text-decoration: line-through;">
+    </span><td><span style="background-color: palegreen; text-decoration: underline;">Tweedledee</span></td><span style="background-color: palegreen; text-decoration: underline;">
+  </span></tr></tbody></table>`,
+			`<table border="1" style="width:100%;"><span style="background-color: lightpink; text-decoration: line-through;">
   </span><tbody><tr><span style="background-color: lightpink; text-decoration: line-through;">
     </span><td><span style="background-color: lightpink; text-decoration: line-through;">Jack</span></td><span style="background-color: lightpink; text-decoration: line-through;">
     </span><td><span style="background-color: lightpink; text-decoration: line-through;">and</span></td><span style="background-color: lightpink; text-decoration: line-through;"> 
     </span><td><span style="background-color: lightpink; text-decoration: line-through;">Jill</span></td><span style="background-color: lightpink; text-decoration: line-through;">
   </span></tr><span style="background-color: lightpink; text-decoration: line-through;">
-  </span><tr><span style="background-color: lightpink; text-decoration: line-through;">
-    </span><td><span style="background-color: lightpink; text-decoration: line-through;">Derby</span></td><span style="background-color: lightpink; text-decoration: line-through;">
+  </span></tbody></table><div><b><i><span style="background-color: palegreen; text-decoration: underline;">...and now for something completely different.</span></i></b></div><table border="1" style="width:100%;"><tbody><tr><span style="background-color: lightpink; text-decoration: line-through;">
+    </span></tr><tr><td><span style="background-color: lightpink; text-decoration: line-through;">Derby</span></td><span style="background-color: lightpink; text-decoration: line-through;">
     </span><td><span style="background-color: lightpink; text-decoration: line-through;">and</span></td><span style="background-color: lightpink; text-decoration: line-through;"> 
     </span><td><span style="background-color: lightpink; text-decoration: line-through;">Joan</span></td><span style="background-color: lightpink; text-decoration: line-through;">
-  </span></tr><span style="background-color: lightpink; text-decoration: line-through;">
-</span></tbody></table><div><b><i><span style="background-color: palegreen; text-decoration: underline;">...and now for something completely different.</span></i></b></div>`}},
+  </span></tr></tbody></table>`}},
 
 	{[]string{"", `<ul><li>A</li><li>B</li><li>C</li></ul>`},
 		[]string{`<ul><li><span style="background-color: palegreen; text-decoration: underline;">A</span></li><li><span style="background-color: palegreen; text-decoration: underline;">B</span></li><li><span style="background-color: palegreen; text-decoration: underline;">C</span></li></ul>`}},
+
+	{[]string{`<p style="">The following typographical conventions are used in this Standard:</p><div style="padding-left:30px;text-indent:-10px">&bull; The first occurrence of a new term is written in italics. [<i>Example</i>: &#8230; is considered <i>normative</i>. <i>end example</i>]</div><div style="padding-left:30px;text-indent:-10px">&bull; A term defined as a basic definition is written in bold. [<i>Example</i>: <b>behavior</b> &#8212; External &#8230; <i>end example</i>]</div><div style="padding-left:30px;text-indent:-10px">&bull; The name of an XML element is written using an Element style. [<i>Example</i>: The root element is document.<i> end example</i>]</div><div style="padding-left:30px;text-indent:-10px">&bull; The name of an XML element attribute is written using an Attribute style. [<i>Example</i>: &#8230; an id attribute.<i> end example</i>]</div><div style="padding-left:30px;text-indent:-10px">&bull; An XML element attribute value is written using a constant-width style. [<i>Example</i>: &#8230; value of CommentReference.<i> end example</i>]</div><div style="padding-left:30px;text-indent:-10px">&bull; An XML element type name is written using a Type style. [<i>Example</i>: &#8230; as values of the xsd:anyURI data type.<i> end example</i>]</div>`,
+		`<p>The following typographical conventions are used in this Standard:</p>
+<div style="padding-left: 30px; text-indent: -10px;">• The first occurrence of a new term is written in italics. [<i>Example</i>: … is considered <i>normative</i>. <i>end example</i>]</div>
+<div style="padding-left: 30px; text-indent: -10px;">• A term defined as a basic definition is written in bold. [<i>Example</i>: <b>behavior</b> — <b>External</b> … <i>end example</i>]</div>
+<div style="padding-left: 30px; text-indent: -10px;">• The name of an XML element attribute is written using an Attribute style. [<i>Example</i>: … an id attribute.<i> end example</i>]</div>
+<div style="padding-left: 30px; text-indent: -10px;">• And here is another entry in the list!</div>
+<div style="padding-left: 30px; text-indent: -10px;">• An XML element attribute value is written using a constant-width style. [<i>Example</i>: … value of CommentReference.<i> end example</i>]</div>
+<div style="padding-left: 30px; text-indent: -10px;">• An XML element type name is written using a Type style. [<i>Example</i>: … as values of the xsd:anyURI data type.<i> end example</i>]</div>
+<div style="padding-left: 30px; text-indent: -10px;"> </div>
+<div style="padding-left: 30px; text-indent: -10px;">elephant.</div>`},
+		[]string{`<p>The following typographical conventions are used in this Standard:</p><div style="padding-left:30px;text-indent:-10px;">• The first occurrence of a new term is written in italics. [<i>Example</i>: … is considered <i>normative</i>. <i>end example</i>]</div><div style="padding-left:30px;text-indent:-10px;">• A term defined as a basic definition is written in bold. [<i>Example</i>: <b>behavior</b> — <b><span style="background-color: lightskyblue; text-decoration: overline;">External</span></b><span style="background-color: lightskyblue; text-decoration: overline;"> … </span><i><span style="background-color: lightskyblue; text-decoration: overline;">end example</span></i><span style="background-color: lightskyblue; text-decoration: overline;">]</span></div><div style="padding-left:30px;text-indent:-10px;">• The name of an XML elemen<span style="background-color: palegreen; text-decoration: underline;">t a</span>t<span style="background-color: palegreen; text-decoration: underline;">tribute</span> is written using an <span style="background-color: lightpink; text-decoration: line-through;">Element</span><span style="background-color: palegreen; text-decoration: underline;">Attribute</span> style. [<i>Example</i>: <span style="background-color: lightpink; text-decoration: line-through;">The</span><span style="background-color: palegreen; text-decoration: underline;">…</span> <span style="background-color: lightpink; text-decoration: line-through;">root element is document</span><span style="background-color: palegreen; text-decoration: underline;">an id attribute</span>.<i> end example</i>]</div><div style="padding-left:30px;text-indent:-10px;">•<span style="background-color: palegreen; text-decoration: underline;"> And</span> <span style="background-color: lightpink; text-decoration: line-through;">The name of an XML element attribute is written using an Attribute style. [</span><i><span style="background-color: lightpink; text-decoration: line-through;">Example</span></i><span style="background-color: lightpink; text-decoration: line-through;">: … an id attribute.</span><i><span style="background-color: lightpink; text-decoration: line-through;"> end example</span></i><span style="background-color: lightpink; text-decoration: line-through;">]</span><span style="background-color: palegreen; text-decoration: underline;">here is another entry in the list!</span></div><div style="padding-left:30px;text-indent:-10px;">• An XML element attribute value is written using a constant-width style. [<i>Example</i>: … value of CommentReference.<i> end example</i>]</div><div style="padding-left:30px;text-indent:-10px;">• An XML element type name is written using a Type style. [<i>Example</i>: … as values of the xsd:anyURI data type.<i> end example</i>]</div><div style="padding-left:30px;text-indent:-10px;"><span style="background-color: palegreen; text-decoration: underline;"> </span></div><div style="padding-left:30px;text-indent:-10px;"><span style="background-color: palegreen; text-decoration: underline;">elephant.</span></div>`}},
 }
 
 func TestSimple(t *testing.T) {
 
 	for s, st := range simpleTests {
-		res, err := cfg.Find(st.versions)
+		res, err := cfg.HTMLdiff(st.versions)
 		if err != nil {
 			t.Errorf("Simple test %d had error %v", s, err)
 		}
@@ -221,7 +229,7 @@ func TestSimple(t *testing.T) {
 
 }
 
-func TestQuick(t *testing.T) {
+func TestParseRender(t *testing.T) {
 	in := `<p style="">Document conformance is purely syntactic; it involves only Items&#160;1 and&#160;2 in &#167;<documize type="field-start"></documize>2.3<documize type="field-end"></documize> above.</p><p style="">A conforming document shall conform to the schema (Item&#160;1) and any additional syntax constraints (Item&#160;2).</p><p style="">The document character set shall conform to the Unicode Standard and ISO/IEC 10646-1, with either the UTF-8 or UTF-16 encoding form, as required by the XML&#160;1.0 standard.</p><p style="">Any XML element or attribute not explicitly included in this Standard shall use the extensibility mechanisms described by Parts 4 and 5 of this Standard.</p>`
 
 	doc, err := html.Parse(strings.NewReader(in))
