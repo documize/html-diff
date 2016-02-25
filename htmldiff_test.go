@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"strings"
 	"testing"
 
@@ -245,5 +246,46 @@ func TestParseRender(t *testing.T) {
 	}
 	if buf.String() != `<html><head></head><body><p style="">Document conformance is purely syntactic; it involves only Items 1 and 2 in §<documize type="field-start"></documize>2.3<documize type="field-end"></documize> above.</p><p style="">A conforming document shall conform to the schema (Item 1) and any additional syntax constraints (Item 2).</p><p style="">The document character set shall conform to the Unicode Standard and ISO/IEC 10646-1, with either the UTF-8 or UTF-16 encoding form, as required by the XML 1.0 standard.</p><p style="">Any XML element or attribute not explicitly included in this Standard shall use the extensibility mechanisms described by Parts 4 and 5 of this Standard.</p></body></html>` {
 		t.Error("wrong result:", buf.String())
+	}
+}
+
+func TestTimeout(t *testing.T) {
+	dir := "." + string(os.PathSeparator) + "testin"
+	files, err := ioutil.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	testHTML := make([]string, 0, len(files))
+	names := make([]string, 0, len(files))
+
+	for _, file := range files {
+		fn := file.Name()
+		if strings.HasSuffix(fn, ".html") {
+			ffn := dir + string(os.PathSeparator) + fn
+			dat, err := ioutil.ReadFile(ffn)
+			if err != nil {
+				t.Fatal(err)
+			}
+			testHTML = append(testHTML, string(dat))
+			names = append(names, fn)
+		}
+	}
+	for f := range testHTML {
+		args := []string{testHTML[f], testHTML[f]}
+		_, err := cfg.HTMLdiff(args) // don't care about the result as we are looking for crashes and time-outs
+		if err != nil {
+			if names[f] != "google.html" {
+				t.Errorf("comparing %s with itself error: %s", names[f], err)
+			}
+		}
+	}
+	for f := range testHTML {
+		args := []string{testHTML[f], strings.ToLower(testHTML[f])}
+		_, err := cfg.HTMLdiff(args) // don't care about the result as we are looking for crashes and time-outs
+		if err != nil {
+			if names[f] != "google.html" && names[f] != "bing.html"  {
+				t.Errorf("comparing %s with its lower-case self error: %s", names[f], err)
+			}
+		}
 	}
 }

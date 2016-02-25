@@ -43,15 +43,17 @@ func findBody(n *html.Node) *html.Node {
 
 // find the first leaf in the tree that is a text node
 func firstLeaf(n *html.Node) (*html.Node, bool) {
-	switch n.Type {
-	case html.TextNode:
-		return n, true
-	}
-	// no valid node found
-	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		r, ok := firstLeaf(c)
-		if ok {
-			return r, ok
+	if n != nil {
+		switch n.Type {
+		case html.TextNode:
+			return n, true
+		}
+		// no valid node found
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			r, ok := firstLeaf(c)
+			if ok {
+				return r, ok
+			}
 		}
 	}
 	return nil, false

@@ -55,7 +55,11 @@ func (ap *appendContext) Less(i, j int) bool {
 	return ap.editList[i].origSeq < ap.editList[j].origSeq
 }
 
-func (ap *appendContext) append(action rune, tr treeRune) {
+func (ap *appendContext) append(action rune, trs []treeRune, idx int) {
+	if idx >= len(trs) { // defending error found by fuzz testing
+		return
+	}
+	tr := trs[idx]
 	if tr.leaf == nil {
 		return
 	}

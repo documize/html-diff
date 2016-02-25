@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/documize/html-diff/diff"
 
@@ -65,8 +66,24 @@ func (c *Config) HTMLdiff(versionsRaw []string) ([]string, error) {
 
 	for m := range mergedHTMLs {
 		go func(m int) {
+			treeRuneLimit := 250000 // from initial testing
+			if len(*sourceTreeRunes[0]) > treeRuneLimit || len(*sourceTreeRunes[m+1]) > treeRuneLimit {
+				parallelErrors <- errors.New("input data too large")
+				return
+			}
 			dd := diffData{a: sourceTreeRunes[0], b: sourceTreeRunes[m+1]}
-			changes := diff.Diff(len(*sourceTreeRunes[0]), len(*sourceTreeRunes[m+1]), dd)
+			var changes []diff.Change
+			ch := make(chan []diff.Change)
+			go func(ch chan []diff.Change) {
+				ch <- diff.Diff(len(*sourceTreeRunes[0]), len(*sourceTreeRunes[m+1]), dd)
+			}(ch)
+			select {
+			case <-time.After(time.Second * 3):
+				parallelErrors <- errors.New("diff.Diff() took too long")
+				return
+			case changes = <-ch:
+				// we have the diff
+			}
 			changes = granular(c.Granularity, dd, changes)
 			mergedTree, err := c.walkChanges(changes, sourceTreeRunes[0], sourceTreeRunes[m+1], firstLeaves[0], firstLeaves[m+1])
 			if err != nil {
@@ -109,18 +126,21 @@ func (c *Config) walkChanges(changes []diff.Change, ap, bp *[]treeRune, aIdx, bI
 	ctx := &appendContext{c: c, target: mergedTree}
 	for _, change := range changes {
 		for aIdx < change.A && bIdx < change.B {
-			ctx.append('=', a[aIdx])
+			ctx.append('=', a, aIdx)
 			aIdx++
 			bIdx++
 		}
 		if change.Del == change.Ins && change.Del > 0 {
 			for i := 0; i < change.Del; i++ {
+				if aIdx+i >= len(a) || bIdx+i >= len(b) {
+					goto textDifferent // defensive after fuzz testing
+				}
 				if a[aIdx+i].letter != b[bIdx+i].letter {
 					goto textDifferent
 				}
 			}
 			for i := 0; i < change.Del; i++ {
-				ctx.append('~', b[bIdx])
+				ctx.append('~', b, bIdx)
 				aIdx++
 				bIdx++
 			}
@@ -128,17 +148,17 @@ func (c *Config) walkChanges(changes []diff.Change, ap, bp *[]treeRune, aIdx, bI
 		}
 	textDifferent:
 		for i := 0; i < change.Del; i++ {
-			ctx.append('-', a[aIdx])
+			ctx.append('-', a, aIdx)
 			aIdx++
 		}
 		for i := 0; i < change.Ins; i++ {
-			ctx.append('+', b[bIdx])
+			ctx.append('+', b, bIdx)
 			bIdx++
 		}
 	textSame:
 	}
 	for aIdx < len(a) && bIdx < len(b) {
-		ctx.append('=', a[aIdx])
+		ctx.append('=', a, aIdx)
 		aIdx++
 		bIdx++
 	}
