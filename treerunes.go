@@ -18,15 +18,13 @@ type diffData struct {
 
 // Equal exists to fulfill the diff.Data interface.
 func (dd diffData) Equal(i, j int) bool {
-	ii := (*dd.a)[i]
-	jj := (*dd.b)[j]
-	if ii.letter != jj.letter && ii.letter > 0 && jj.letter > 0 {
+	if (*dd.a)[i].letter != (*dd.b)[j].letter {
 		return false
 	}
-	if !posEqual(ii.pos, jj.pos) {
+	if !posEqual((*dd.a)[i].pos, (*dd.b)[j].pos) {
 		return false
 	}
-	return nodeTreeEqual(ii.leaf, jj.leaf)
+	return nodeTreeEqual((*dd.a)[i].leaf, (*dd.b)[j].leaf)
 }
 
 func nodeTreeEqual(leafA, leafB *html.Node) bool {
