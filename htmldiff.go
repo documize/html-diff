@@ -36,7 +36,7 @@ func (c *Config) HTMLdiff(versionsRaw []string) ([]string, error) {
 			if err == nil {
 				sourceTrees[v], err = html.Parse(vv)
 				if err == nil {
-					tr := make([]treeRune, 0, 1024)
+					tr := make([]treeRune, 0, estimateTreeRunes(sourceTrees[v]))
 					sourceTreeRunes[v] = &tr
 					renderTreeRunes(sourceTrees[v], &tr)
 					leaf1, ok := firstLeaf(findBody(sourceTrees[v]))
