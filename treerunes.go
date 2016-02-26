@@ -1,6 +1,8 @@
 package htmldiff
 
 import (
+	"unicode/utf8"
+
 	"github.com/documize/html-diff/diff"
 
 	"golang.org/x/net/html"
@@ -75,7 +77,7 @@ func estimateTreeRunes(n *html.Node) int {
 	if n.FirstChild == nil { // it is a leaf node
 		switch n.Type {
 		case html.TextNode:
-			size += len(n.Data) // to be correct: utf8.RuneCountInString(n.Data) - but that is slower
+			size += utf8.RuneCountInString(n.Data) // len(n.Data) would be faster, but use more memory
 		default:
 			size++
 		}

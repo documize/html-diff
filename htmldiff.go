@@ -77,12 +77,19 @@ func (c *Config) HTMLdiff(versionsRaw []string) ([]string, error) {
 			go func(ch chan []diff.Change) {
 				ch <- diff.Diff(len(*sourceTreeRunes[0]), len(*sourceTreeRunes[m+1]), dd)
 			}(ch)
+			to := time.After(time.Second * 3)
 			select {
-			case <-time.After(time.Second * 3):
+			case <-to:
 				parallelErrors <- errors.New("diff.Diff() took too long")
+				go func(ch chan []diff.Change) {
+					<-ch // make sure the timed-out diff cleans-up
+				}(ch)
 				return
 			case changes = <-ch:
 				// we have the diff
+				go func(to <-chan time.Time) {
+					<-to // make sure we don't leak the timer goroutine
+				}(to)
 			}
 			changes = granular(c.Granularity, dd, changes)
 			mergedTree, err := c.walkChanges(changes, sourceTreeRunes[0], sourceTreeRunes[m+1], firstLeaves[0], firstLeaves[m+1])
