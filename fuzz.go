@@ -170,6 +170,7 @@ tryAgain:
 	fcfg.cmp = []string{baseHTML, string(dat)}
 }
 */
+
 func uint1(data *[]byte) uint {
 	if len(*data) < 1 {
 		return 0

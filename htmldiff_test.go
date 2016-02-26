@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"golang.org/x/net/html"
 
@@ -249,7 +251,7 @@ func TestParseRender(t *testing.T) {
 	}
 }
 
-func TestTimeout(t *testing.T) {
+func TestTimeoutAndMemory(t *testing.T) {
 	dir := "." + string(os.PathSeparator) + "testin"
 	files, err := ioutil.ReadDir(dir)
 	if err != nil {
@@ -270,20 +272,45 @@ func TestTimeout(t *testing.T) {
 			names = append(names, fn)
 		}
 	}
-	for f := range testHTML {
-		args := []string{testHTML[f], testHTML[f]}
-		_, err := cfg.HTMLdiff(args) // don't care about the result as we are looking for crashes and time-outs
-		if err != nil {
-			if names[f] != "google.html" {
-				t.Errorf("comparing %s with itself error: %s", names[f], err)
+
+	fmt.Println("NOTE: this test may take a few minutes to run")
+
+	var ms runtime.MemStats
+	var alloc1 uint64
+	goroutineCount1 := 2 // the number of goroutines in a quiet state
+	for i := 0; i < 2; i++ {
+		testToMem(testHTML, names, t)
+		limit := 60
+		var goroutineCount, secs int
+		for secs = 1; secs <= limit; secs++ {
+			time.Sleep(time.Second) // wait for the timeout goroutines to finish
+			goroutineCount, _ = runtime.GoroutineProfile(nil)
+			if goroutineCount == goroutineCount1 {
+				goto correctGoroutines
+			}
+		}
+		t.Error(fmt.Sprintln("after ", secs, "seconds, num goroutines", goroutineCount, "when should be", goroutineCount1))
+	correctGoroutines:
+		runtime.GC()
+		runtime.ReadMemStats(&ms)
+		if alloc1 == 0 {
+			alloc1 = ms.Alloc // this is set here to allow for static data set-up by 1st pass through
+			fmt.Println("NOTE: base case established in", secs, "seconds. Memory used=", alloc1)
+		} else {
+			increase := (100.0 * float64(ms.Alloc) / float64(alloc1)) - 100.0
+			if increase > 0.2 { // %
+				t.Error(fmt.Sprintln("run", i, "memory usage changed from", alloc1, "to", ms.Alloc, "increase:", ms.Alloc-alloc1, "which is", increase, "%"))
 			}
 		}
 	}
+}
+
+func testToMem(testHTML, names []string, t *testing.T) {
 	for f := range testHTML {
 		args := []string{testHTML[f], strings.ToLower(testHTML[f])}
 		_, err := cfg.HTMLdiff(args) // don't care about the result as we are looking for crashes and time-outs
 		if err != nil {
-			if names[f] != "google.html" && names[f] != "bing.html"  {
+			if names[f] != "google.html" && names[f] != "bing.html" { // we expect errors on these two
 				t.Errorf("comparing %s with its lower-case self error: %s", names[f], err)
 			}
 		}
