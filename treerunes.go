@@ -18,15 +18,13 @@ type diffData struct {
 
 // Equal exists to fulfill the diff.Data interface.
 func (dd diffData) Equal(i, j int) bool {
-	ii := (*dd.a)[i]
-	jj := (*dd.b)[j]
-	if ii.letter != jj.letter && ii.letter > 0 && jj.letter > 0 {
+	if (*dd.a)[i].letter != (*dd.b)[j].letter {
 		return false
 	}
-	if !posEqual(ii.pos, jj.pos) {
+	if !posEqual((*dd.a)[i].pos, (*dd.b)[j].pos) {
 		return false
 	}
-	return nodeTreeEqual(ii.leaf, jj.leaf)
+	return nodeTreeEqual((*dd.a)[i].leaf, (*dd.b)[j].leaf)
 }
 
 func nodeTreeEqual(leafA, leafB *html.Node) bool {
@@ -70,6 +68,23 @@ func nodeEqualExText(base, comp *html.Node) bool {
 		return false // only test for the same data if not a text node
 	}
 	return true
+}
+
+func estimateTreeRunes(n *html.Node) int {
+	size := 0
+	if n.FirstChild == nil { // it is a leaf node
+		switch n.Type {
+		case html.TextNode:
+			size += len(n.Data) // to be correct: utf8.RuneCountInString(n.Data) - but that is slower
+		default:
+			size++
+		}
+	} else {
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			size += estimateTreeRunes(c)
+		}
+	}
+	return size
 }
 
 func renderTreeRunes(n *html.Node, tr *[]treeRune) {
