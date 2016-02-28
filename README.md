@@ -1,6 +1,6 @@
 # html-diff
 
-Calculate difference between two HTML snippets.
+Calculate difference between two HTML snippets and return those differences as a merged HTML snippet showing the changes.
 
 Usage (see example):
 ```
@@ -15,12 +15,12 @@ Usage (see example):
     mergedHTML := res[0]
 ```
 
-First working version, pull requests welcome.
-
 Only deals with body HTML, so no headers, only what is within the body element.
 
-Vendors "github.com/mb0/diff" in the diff directory. Does not currently vendor "golang.org/x/net/html" or "golang.org/x/net/html/atom".
+Requires Go1.5+, with vendoring support. Vendors "github.com/mb0/diff", but does not vendor dependencies "golang.org/x/net/html" or "golang.org/x/net/html/atom".
 
 Running the tests will create output files in testout/*.html.
 
-For fuzz-testing using https://github.com/dvyukov/go-fuzz , the Fuzz() function is in fuzz.go .
+For fuzz-testing using https://github.com/dvyukov/go-fuzz , the Fuzz() function is in fuzz.go (as at Feb'16 you need to rename the ```vendor``` directory while you fuzz, and ```go get github.com/mb0/diff``` - an issue with ).
+
+Pull requests welcome.

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/documize/html-diff/diff"
+	"github.com/mb0/diff"
 
 	"golang.org/x/net/html"
 )

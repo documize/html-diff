@@ -1,7 +1,7 @@
 package htmldiff
 
 import (
-	"github.com/documize/html-diff/diff"
+	"github.com/mb0/diff"
 
 	"golang.org/x/net/html"
 )
@@ -17,7 +17,7 @@ type diffData struct {
 }
 
 // Equal exists to fulfill the diff.Data interface.
-// NOTE: this is usually the most called function in the package
+// NOTE: this is usually the most called function in the package!
 func (dd diffData) Equal(i, j int) bool {
 	if (*dd.a)[i].letter != (*dd.b)[j].letter {
 		return false
@@ -42,6 +42,9 @@ func nodeTreeEqual(leafA, leafB *html.Node) bool {
 }
 
 func attrEqual(base, comp *html.Node) bool {
+	if len(comp.Attr) != len(base.Attr) {
+		return false
+	}
 	for a := range comp.Attr {
 		if comp.Attr[a].Key != base.Attr[a].Key ||
 			comp.Attr[a].Namespace != base.Attr[a].Namespace ||
@@ -53,22 +56,12 @@ func attrEqual(base, comp *html.Node) bool {
 }
 
 func nodeEqualExText(base, comp *html.Node) bool {
-	if base == nil || comp == nil {
-		return false
-	}
 	if comp.DataAtom != base.DataAtom ||
 		comp.Namespace != base.Namespace ||
-		comp.Type != base.Type ||
-		len(comp.Attr) != len(base.Attr) {
+		comp.Type != base.Type {
 		return false
 	}
-	if !attrEqual(base, comp) {
-		return false
-	}
-	if comp.Data != base.Data && base.Type != html.TextNode {
-		return false // only test for the same data if not a text node
-	}
-	return true
+	return attrEqual(base, comp)
 }
 
 func renderTreeRunes(n *html.Node, tr *[]treeRune) {

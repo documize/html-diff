@@ -14,17 +14,13 @@ func copyNode(to, from *html.Node) {
 }
 
 func nodeEqual(base, comp *html.Node) bool {
-	if comp.Data != base.Data ||
-		comp.DataAtom != base.DataAtom ||
-		comp.Namespace != base.Namespace ||
-		comp.Type != base.Type ||
-		len(comp.Attr) != len(base.Attr) {
-		return false
+	if nodeEqualExText(base, comp) {
+		if base.Type == html.TextNode {
+			return base.Data == comp.Data
+		}
+		return true
 	}
-	if !attrEqual(base, comp) {
-		return false
-	}
-	return true
+	return false
 }
 
 // findBody finds the first body HTML node if it exists in the tree. Required to bypass the page title text.
