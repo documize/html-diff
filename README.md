@@ -21,6 +21,6 @@ Requires Go1.5+, with vendoring support. Vendors "github.com/mb0/diff", but does
 
 Running the tests will create output files in testout/*.html.
 
-For fuzz-testing using https://github.com/dvyukov/go-fuzz , the Fuzz() function is in fuzz.go (as at Feb'16 you need to rename the ```vendor``` directory while you fuzz, and ```go get github.com/mb0/diff``` - an issue with ).
+For fuzz-testing using https://github.com/dvyukov/go-fuzz , the Fuzz() function is in fuzz.go (as at Feb'16 you need to rename the ```vendor``` directory while you fuzz, and ```go get github.com/mb0/diff``` - an issue with "go/importer", see https://github.com/golang/go/issues/13756).
 
 Pull requests welcome.
