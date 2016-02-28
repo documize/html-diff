@@ -19,41 +19,38 @@ type Config struct {
 }
 
 // HTMLdiff finds all the differences in the versions of HTML snippits,
-// versionsRaw[0] is the original, all other versions are the edits to be compared.
+// versions[0] is the original, all other versions are the edits to be compared.
 // The resulting merged HTML snippits are as many as there are edits to compare.
-func (c *Config) HTMLdiff(versionsRaw []string) ([]string, error) {
-	if len(versionsRaw) < 2 {
+func (c *Config) HTMLdiff(versions []string) ([]string, error) {
+	if len(versions) < 2 {
 		return nil, errors.New("there must be at least two versions to diff, the 0th element is the base")
 	}
-	versions := make([]string, len(versionsRaw))
 	parallelErrors := make(chan error, len(versions))
 	sourceTrees := make([]*html.Node, len(versions))
 	sourceTreeRunes := make([]*[]treeRune, len(versions))
 	firstLeaves := make([]int, len(versions))
-	for v, vvr := range versionsRaw {
-		go func(v int, vvr string) {
-			vv, err := c.clean(vvr)
+	for v, vv := range versions {
+		go func(v int, vv string) {
+			var err error
+			sourceTrees[v], err = html.Parse(strings.NewReader(vv))
 			if err == nil {
-				sourceTrees[v], err = html.Parse(vv)
-				if err == nil {
-					tr := make([]treeRune, 0, estimateTreeRunes(sourceTrees[v]))
-					sourceTreeRunes[v] = &tr
-					renderTreeRunes(sourceTrees[v], &tr)
-					leaf1, ok := firstLeaf(findBody(sourceTrees[v]))
-					if leaf1 == nil || !ok {
-						firstLeaves[v] = 0 // probably wrong
-					} else {
-						for x, y := range tr {
-							if y.leaf == leaf1 {
-								firstLeaves[v] = x
-								break
-							}
+				tr := make([]treeRune, 0, c.clean(sourceTrees[v]))
+				sourceTreeRunes[v] = &tr
+				renderTreeRunes(sourceTrees[v], &tr)
+				leaf1, ok := firstLeaf(findBody(sourceTrees[v]))
+				if leaf1 == nil || !ok {
+					firstLeaves[v] = 0 // probably wrong
+				} else {
+					for x, y := range tr {
+						if y.leaf == leaf1 {
+							firstLeaves[v] = x
+							break
 						}
 					}
 				}
 			}
 			parallelErrors <- err
-		}(v, vvr)
+		}(v, vv)
 	}
 	for _ = range versions {
 		if err := <-parallelErrors; err != nil {
