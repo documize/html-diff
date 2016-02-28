@@ -2,7 +2,6 @@ package htmldiff
 
 import (
 	"sort"
-	"strings"
 
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
@@ -37,19 +36,19 @@ func (ap *appendContext) Swap(i, j int) {
 
 // Less is part of sort.Interface.
 func (ap *appendContext) Less(i, j int) bool {
-	ip := ap.editList[i].pos
-	jp := ap.editList[j].pos
-	ii := len(ip) - 1
-	jj := len(jp) - 1
-	for ii > 0 && jj > 0 {
-		if ip[ii].nodesBefore < jp[jj].nodesBefore {
-			return true
+	if len(ap.editList[i].pos) > 0 && len(ap.editList[j].pos) > 0 { // both are in containers
+		ii := len(ap.editList[i].pos) - 1
+		jj := len(ap.editList[j].pos) - 1
+		for ii > 0 && jj > 0 {
+			if ap.editList[i].pos[ii].nodesBefore < ap.editList[j].pos[jj].nodesBefore {
+				return true
+			}
+			if ap.editList[i].pos[ii].nodesBefore > ap.editList[j].pos[jj].nodesBefore {
+				return false
+			}
+			ii--
+			jj--
 		}
-		if ip[ii].nodesBefore > jp[jj].nodesBefore {
-			return false
-		}
-		ii--
-		jj--
 	}
 	// run out of one or the other
 	return ap.editList[i].origSeq < ap.editList[j].origSeq
@@ -158,24 +157,12 @@ func (ap *appendContext) append1(action rune, text string, proto *html.Node, pos
 	appendPoint.AppendChild(newLeaf)
 }
 
-func lastNonSpaceSibling(n *html.Node) *html.Node {
-	var ret *html.Node
-	for sib := n.FirstChild; sib != nil; sib = sib.NextSibling {
-		if sib.Type == html.TextNode && strings.TrimSpace(sib.Data) == "" {
-			// ignore it
-		} else {
-			ret = sib
-		}
-	}
-	return ret
-}
-
 func (ap *appendContext) lastMatchingLeaf(proto *html.Node, action rune, pos posT) (appendPoint, protoAncestor *html.Node) {
 	if ap.targetBody == nil {
 		ap.targetBody = findBody(ap.target)
 	}
 	candidates := []*html.Node{}
-	for cand := ap.target; cand != nil; cand = lastNonSpaceSibling(cand) {
+	for cand := ap.target; cand != nil; cand = cand.LastChild {
 		candidates = append([]*html.Node{cand}, candidates...)
 	}
 	candidates = append(candidates, ap.targetBody) // longstop

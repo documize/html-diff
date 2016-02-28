@@ -22,7 +22,7 @@ func BenchmarkHTMLdiff(b *testing.B) {
 	bbclc := strings.ToLower(bbc)
 	args := []string{bbc, bbclc}
 	for n := 0; n < b.N; n++ {
-		_, err := cfgBench.HTMLdiff(args) // don't care about the result as we are looking at speed 
+		_, err := cfgBench.HTMLdiff(args) // don't care about the result as we are looking at speed
 		if err != nil {
 			b.Errorf("comparing BBC news with its lower-case self error: %s", err)
 		}

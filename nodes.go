@@ -58,3 +58,21 @@ func firstLeaf(n *html.Node) (*html.Node, bool) {
 	}
 	return nil, false
 }
+
+// find if this or any parent is a container element where position is important like a list or table.
+func inContainer(n *html.Node) bool {
+	if n == nil {
+		return false
+	}
+	if n.Type == html.ElementNode {
+		switch n.DataAtom {
+		case atom.Body:
+			return false
+		case atom.Td, atom.Th, atom.Tr, atom.Tbody, atom.Thead, atom.Tfoot,
+			atom.Table, atom.Caption, atom.Colgroup, atom.Col, // tables
+			atom.Li, atom.Ul, atom.Ol: // lists
+			return true
+		}
+	}
+	return inContainer(n.Parent)
+}

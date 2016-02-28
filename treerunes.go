@@ -19,6 +19,7 @@ type diffData struct {
 }
 
 // Equal exists to fulfill the diff.Data interface.
+// NOTE: this is usually the most called function in the package
 func (dd diffData) Equal(i, j int) bool {
 	if (*dd.a)[i].letter != (*dd.b)[j].letter {
 		return false

@@ -59,11 +59,6 @@ func (c *Config) clean(raw string) (io.Reader, error) {
 						goto searchChildren
 					}
 				}
-			case html.TextNode:
-				if ch.Data == "\n" && ch.Parent.DataAtom != atom.Pre {
-					n.RemoveChild(ch)
-					goto searchChildren
-				}
 			}
 			f(ch)
 		}
