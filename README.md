@@ -2,7 +2,7 @@
 
 Calculate difference between two HTML snippets and return those differences as a merged HTML snippet showing the changes.
 
-Usage (see example):
+Usage:
 ```
 	var cfg = &htmldiff.Config{
 		Granularity:  5,
@@ -12,8 +12,9 @@ Usage (see example):
 		CleanTags:    []string{""},
 	}
 	res, err := cfg.HTMLdiff([]string{previousHTML, latestHTML})
-    mergedHTML := res[0]
+	mergedHTML := res[0]
 ```
+![see example_test.go](example_test.png)
 
 Only deals with body HTML, so no headers, only what is within the body element.
 
