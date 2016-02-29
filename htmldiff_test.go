@@ -1,7 +1,6 @@
 package htmldiff_test
 
 import (
-	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -10,16 +9,14 @@ import (
 	"testing"
 	"time"
 
-	"golang.org/x/net/html"
-
 	"github.com/documize/html-diff"
 )
 
 var cfg = &htmldiff.Config{
 	Granularity:  6,
-	InsertedSpan: []html.Attribute{{Key: "style", Val: "background-color: palegreen; text-decoration: underline;"}},
-	DeletedSpan:  []html.Attribute{{Key: "style", Val: "background-color: lightpink; text-decoration: line-through;"}},
-	ReplacedSpan: []html.Attribute{{Key: "style", Val: "background-color: lightskyblue; text-decoration: overline;"}},
+	InsertedSpan: []htmldiff.Attribute{{Key: "style", Val: "background-color: palegreen; text-decoration: underline;"}},
+	DeletedSpan:  []htmldiff.Attribute{{Key: "style", Val: "background-color: lightpink; text-decoration: line-through;"}},
+	ReplacedSpan: []htmldiff.Attribute{{Key: "style", Val: "background-color: lightskyblue; text-decoration: overline;"}},
 	CleanTags:    []string{"documize"},
 }
 
@@ -303,25 +300,6 @@ func TestSimple(t *testing.T) {
 		}
 	}
 
-}
-
-func TestParseRender(t *testing.T) {
-	in := `<p style="">Document conformance is purely syntactic; it involves only Items&#160;1 and&#160;2 in &#167;<documize type="field-start"></documize>2.3<documize type="field-end"></documize> above.</p><p style="">A conforming document shall conform to the schema (Item&#160;1) and any additional syntax constraints (Item&#160;2).</p><p style="">The document character set shall conform to the Unicode Standard and ISO/IEC 10646-1, with either the UTF-8 or UTF-16 encoding form, as required by the XML&#160;1.0 standard.</p><p style="">Any XML element or attribute not explicitly included in this Standard shall use the extensibility mechanisms described by Parts 4 and 5 of this Standard.</p>`
-
-	doc, err := html.Parse(strings.NewReader(in))
-	if err != nil {
-		t.Error(err)
-		t.Fatal()
-	}
-	var buf bytes.Buffer
-	err = html.Render(&buf, doc)
-	if err != nil {
-		t.Error(err)
-		t.Fatal()
-	}
-	if buf.String() != `<html><head></head><body><p style="">Document conformance is purely syntactic; it involves only Items 1 and 2 in §<documize type="field-start"></documize>2.3<documize type="field-end"></documize> above.</p><p style="">A conforming document shall conform to the schema (Item 1) and any additional syntax constraints (Item 2).</p><p style="">The document character set shall conform to the Unicode Standard and ISO/IEC 10646-1, with either the UTF-8 or UTF-16 encoding form, as required by the XML 1.0 standard.</p><p style="">Any XML element or attribute not explicitly included in this Standard shall use the extensibility mechanisms described by Parts 4 and 5 of this Standard.</p></body></html>` {
-		t.Error("wrong result:", buf.String())
-	}
 }
 
 func TestTimeoutAndMemory(t *testing.T) {

@@ -6,12 +6,14 @@ import (
 	"golang.org/x/net/html"
 )
 
+// treeRune holds an individual rune in the HTML along with the node it is in and, for convienience, its position (if in a container).
 type treeRune struct {
 	leaf   *html.Node
 	letter rune
 	pos    posT
 }
 
+// diffData is a type that exists in order to provide a diff.Data interface. It holds the two sets of treeRunes to difference.
 type diffData struct {
 	a, b *[]treeRune
 }
@@ -25,10 +27,11 @@ func (dd diffData) Equal(i, j int) bool {
 	if !posEqual((*dd.a)[i].pos, (*dd.b)[j].pos) {
 		return false
 	}
-	return nodeTreeEqual((*dd.a)[i].leaf, (*dd.b)[j].leaf)
+	return nodeBranchesEqual((*dd.a)[i].leaf, (*dd.b)[j].leaf)
 }
 
-func nodeTreeEqual(leafA, leafB *html.Node) bool {
+// nodeBranchesEqual checks that two leaves come from branches that can be compared.
+func nodeBranchesEqual(leafA, leafB *html.Node) bool {
 	if !nodeEqualExText(leafA, leafB) {
 		return false
 	}
@@ -41,6 +44,7 @@ func nodeTreeEqual(leafA, leafB *html.Node) bool {
 	return false // one of the leaves has a parent, the other does not
 }
 
+// attrEqual checks that the attributes of two nodes are the same.
 func attrEqual(base, comp *html.Node) bool {
 	if len(comp.Attr) != len(base.Attr) {
 		return false
@@ -55,6 +59,7 @@ func attrEqual(base, comp *html.Node) bool {
 	return true
 }
 
+// compares nodes excluding their text
 func nodeEqualExText(base, comp *html.Node) bool {
 	if comp.DataAtom != base.DataAtom ||
 		comp.Namespace != base.Namespace ||
@@ -64,6 +69,7 @@ func nodeEqualExText(base, comp *html.Node) bool {
 	return attrEqual(base, comp)
 }
 
+// renders a tree of nodes into a slice of treeRunes.
 func renderTreeRunes(n *html.Node, tr *[]treeRune) {
 	p := getPos(n)
 	if n.FirstChild == nil { // it is a leaf node

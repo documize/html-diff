@@ -14,13 +14,7 @@ func copyNode(to, from *html.Node) {
 }
 
 func nodeEqual(base, comp *html.Node) bool {
-	if nodeEqualExText(base, comp) {
-		if base.Type == html.TextNode {
-			return base.Data == comp.Data
-		}
-		return true
-	}
-	return false
+	return base.Data == comp.Data && nodeEqualExText(base, comp)
 }
 
 // findBody finds the first body HTML node if it exists in the tree. Required to bypass the page title text.
@@ -37,7 +31,7 @@ func findBody(n *html.Node) *html.Node {
 	return nil
 }
 
-// find the first leaf in the tree that is a text node
+// find the first leaf in the tree that is a text node.
 func firstLeaf(n *html.Node) (*html.Node, bool) {
 	if n != nil {
 		switch n.Type {

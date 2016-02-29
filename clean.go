@@ -9,6 +9,7 @@ import (
 	"golang.org/x/net/html/atom"
 )
 
+// delAttr() deletes an unwanted attribute.
 func delAttr(attr []html.Attribute, ai int) (ret []html.Attribute) {
 	if len(attr) <= 1 || ai >= len(attr) {
 		return nil

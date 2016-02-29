@@ -2,14 +2,16 @@ package htmldiff
 
 import "golang.org/x/net/html"
 
+// posTT gives the relative position within one level of a nested container.
 type posTT struct {
 	nodesBefore int
 	node        *html.Node
 }
 
-// posT gives the relative position within a nested set of containers
+// posT gives the relative position within a nested set of containers.
 type posT []posTT
 
+// getPos returns the relative posion of this node within the enclosing containers, if there are any.
 func getPos(n *html.Node) posT {
 	if n == nil {
 		return nil
@@ -30,10 +32,6 @@ func getPos(n *html.Node) posT {
 		depth--
 	}
 	return ret
-}
-
-func posEqualDepth(a, b posT) bool {
-	return len(a) == len(b)
 }
 
 func posEqual(a, b posT) bool {
