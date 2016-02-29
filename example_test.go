@@ -3,8 +3,6 @@ package htmldiff_test
 import (
 	"fmt"
 
-	"golang.org/x/net/html"
-
 	"github.com/documize/html-diff"
 )
 
@@ -13,9 +11,9 @@ func ExampleHTMLdiff() {
 	latestHTML := `<p>Bullet <b>list:</b></p><ul><li>first item</li><li>number two</li><li>3rd</li></ul>`
 	var cfg = &htmldiff.Config{
 		Granularity:  5,
-		InsertedSpan: []html.Attribute{{Key: "style", Val: "background-color: palegreen;"}},
-		DeletedSpan:  []html.Attribute{{Key: "style", Val: "background-color: lightpink;"}},
-		ReplacedSpan: []html.Attribute{{Key: "style", Val: "background-color: lightskyblue;"}},
+		InsertedSpan: []htmldiff.Attribute{{Key: "style", Val: "background-color: palegreen;"}},
+		DeletedSpan:  []htmldiff.Attribute{{Key: "style", Val: "background-color: lightpink;"}},
+		ReplacedSpan: []htmldiff.Attribute{{Key: "style", Val: "background-color: lightskyblue;"}},
 		CleanTags:    []string{""},
 	}
 

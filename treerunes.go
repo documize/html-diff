@@ -1,24 +1,25 @@
 package htmldiff
 
 import (
-	"unicode/utf8"
-
-	"github.com/documize/html-diff/diff"
+	"github.com/mb0/diff"
 
 	"golang.org/x/net/html"
 )
 
+// treeRune holds an individual rune in the HTML along with the node it is in and, for convienience, its position (if in a container).
 type treeRune struct {
 	leaf   *html.Node
 	letter rune
 	pos    posT
 }
 
+// diffData is a type that exists in order to provide a diff.Data interface. It holds the two sets of treeRunes to difference.
 type diffData struct {
 	a, b *[]treeRune
 }
 
 // Equal exists to fulfill the diff.Data interface.
+// NOTE: this is usually the most called function in the package!
 func (dd diffData) Equal(i, j int) bool {
 	if (*dd.a)[i].letter != (*dd.b)[j].letter {
 		return false
@@ -26,10 +27,11 @@ func (dd diffData) Equal(i, j int) bool {
 	if !posEqual((*dd.a)[i].pos, (*dd.b)[j].pos) {
 		return false
 	}
-	return nodeTreeEqual((*dd.a)[i].leaf, (*dd.b)[j].leaf)
+	return nodeBranchesEqual((*dd.a)[i].leaf, (*dd.b)[j].leaf)
 }
 
-func nodeTreeEqual(leafA, leafB *html.Node) bool {
+// nodeBranchesEqual checks that two leaves come from branches that can be compared.
+func nodeBranchesEqual(leafA, leafB *html.Node) bool {
 	if !nodeEqualExText(leafA, leafB) {
 		return false
 	}
@@ -42,7 +44,11 @@ func nodeTreeEqual(leafA, leafB *html.Node) bool {
 	return false // one of the leaves has a parent, the other does not
 }
 
+// attrEqual checks that the attributes of two nodes are the same.
 func attrEqual(base, comp *html.Node) bool {
+	if len(comp.Attr) != len(base.Attr) {
+		return false
+	}
 	for a := range comp.Attr {
 		if comp.Attr[a].Key != base.Attr[a].Key ||
 			comp.Attr[a].Namespace != base.Attr[a].Namespace ||
@@ -53,42 +59,17 @@ func attrEqual(base, comp *html.Node) bool {
 	return true
 }
 
+// compares nodes excluding their text
 func nodeEqualExText(base, comp *html.Node) bool {
-	if base == nil || comp == nil {
-		return false
-	}
 	if comp.DataAtom != base.DataAtom ||
 		comp.Namespace != base.Namespace ||
-		comp.Type != base.Type ||
-		len(comp.Attr) != len(base.Attr) {
+		comp.Type != base.Type {
 		return false
 	}
-	if !attrEqual(base, comp) {
-		return false
-	}
-	if comp.Data != base.Data && base.Type != html.TextNode {
-		return false // only test for the same data if not a text node
-	}
-	return true
+	return attrEqual(base, comp)
 }
 
-func estimateTreeRunes(n *html.Node) int {
-	size := 0
-	if n.FirstChild == nil { // it is a leaf node
-		switch n.Type {
-		case html.TextNode:
-			size += utf8.RuneCountInString(n.Data) // len(n.Data) would be faster, but use more memory
-		default:
-			size++
-		}
-	} else {
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			size += estimateTreeRunes(c)
-		}
-	}
-	return size
-}
-
+// renders a tree of nodes into a slice of treeRunes.
 func renderTreeRunes(n *html.Node, tr *[]treeRune) {
 	p := getPos(n)
 	if n.FirstChild == nil { // it is a leaf node

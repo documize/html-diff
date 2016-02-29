@@ -6,54 +6,69 @@ import (
 	"strings"
 	"time"
 
-	"github.com/documize/html-diff/diff"
+	"github.com/mb0/diff"
 
 	"golang.org/x/net/html"
 )
 
-// Config describes the way that HTMLdiff() works.
+// Attribute exists so that this package does not export html.Attribute, to allow vendoring of "golang.org/x/net/html".
+type Attribute struct {
+	Namespace, Key, Val string
+}
+
+// return the "golang.org/x/net/html" version of a slice of Attribute
+func convertAttributes(atts []Attribute) []html.Attribute {
+	ret := make([]html.Attribute, 0, len(atts))
+	for _, a := range atts {
+		ret = append(ret, html.Attribute{
+			Namespace: a.Namespace,
+			Key:       a.Key,
+			Val:       a.Val,
+		})
+	}
+	return ret
+}
+
+// Config describes the way that HTMLdiff works.
 type Config struct {
-	Granularity                             int              // how many letters to put together for a change, if possible
-	InsertedSpan, DeletedSpan, ReplacedSpan []html.Attribute // the attributes for the span tags wrapping changes
-	CleanTags                               []string         // HTML tags to clean from the input
+	Granularity                             int         // how many letters to put together for a change, if possible
+	InsertedSpan, DeletedSpan, ReplacedSpan []Attribute // the attributes for the span tags wrapping changes
+	CleanTags                               []string    // HTML tags to clean from the input
 }
 
 // HTMLdiff finds all the differences in the versions of HTML snippits,
-// versionsRaw[0] is the original, all other versions are the edits to be compared.
+// versions[0] is the original, all other versions are the edits to be compared.
 // The resulting merged HTML snippits are as many as there are edits to compare.
-func (c *Config) HTMLdiff(versionsRaw []string) ([]string, error) {
-	if len(versionsRaw) < 2 {
+func (c *Config) HTMLdiff(versions []string) ([]string, error) {
+	if len(versions) < 2 {
 		return nil, errors.New("there must be at least two versions to diff, the 0th element is the base")
 	}
-	versions := make([]string, len(versionsRaw))
 	parallelErrors := make(chan error, len(versions))
 	sourceTrees := make([]*html.Node, len(versions))
 	sourceTreeRunes := make([]*[]treeRune, len(versions))
 	firstLeaves := make([]int, len(versions))
-	for v, vvr := range versionsRaw {
-		go func(v int, vvr string) {
-			vv, err := c.clean(vvr)
+	for v, vv := range versions {
+		go func(v int, vv string) {
+			var err error
+			sourceTrees[v], err = html.Parse(strings.NewReader(vv))
 			if err == nil {
-				sourceTrees[v], err = html.Parse(vv)
-				if err == nil {
-					tr := make([]treeRune, 0, estimateTreeRunes(sourceTrees[v]))
-					sourceTreeRunes[v] = &tr
-					renderTreeRunes(sourceTrees[v], &tr)
-					leaf1, ok := firstLeaf(findBody(sourceTrees[v]))
-					if leaf1 == nil || !ok {
-						firstLeaves[v] = 0 // probably wrong
-					} else {
-						for x, y := range tr {
-							if y.leaf == leaf1 {
-								firstLeaves[v] = x
-								break
-							}
+				tr := make([]treeRune, 0, c.clean(sourceTrees[v]))
+				sourceTreeRunes[v] = &tr
+				renderTreeRunes(sourceTrees[v], &tr)
+				leaf1, ok := firstLeaf(findBody(sourceTrees[v]))
+				if leaf1 == nil || !ok {
+					firstLeaves[v] = 0 // could be wrong, but correct for simple examples
+				} else {
+					for x, y := range tr {
+						if y.leaf == leaf1 {
+							firstLeaves[v] = x
+							break
 						}
 					}
 				}
 			}
 			parallelErrors <- err
-		}(v, vvr)
+		}(v, vv)
 	}
 	for _ = range versions {
 		if err := <-parallelErrors; err != nil {
@@ -123,6 +138,9 @@ func (c *Config) HTMLdiff(versionsRaw []string) ([]string, error) {
 	return mergedHTMLs, nil
 }
 
+// walkChanges goes through the changes identified by diff, identifies where a change is a repacement,
+// then appends the changes to the output set. Once that set is complete, after ctx.flush(),
+// they are finally resorted (to re-order those in containers) and written out using ctx.sortAndWrite().
 func (c *Config) walkChanges(changes []diff.Change, ap, bp *[]treeRune, aIdx, bIdx int) (*html.Node, error) {
 	mergedTree, err := html.Parse(strings.NewReader("<html><head></head><body></body></html>"))
 	if err != nil {

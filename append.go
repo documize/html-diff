@@ -2,12 +2,12 @@ package htmldiff
 
 import (
 	"sort"
-	"strings"
 
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
 )
 
+// the things we need to know while appending.
 type appendContext struct {
 	c                             *Config
 	target, targetBody, lastProto *html.Node
@@ -17,6 +17,7 @@ type appendContext struct {
 	editList                      []editEntry
 }
 
+// an individual edit action.
 type editEntry struct {
 	action  rune
 	text    string
@@ -37,24 +38,24 @@ func (ap *appendContext) Swap(i, j int) {
 
 // Less is part of sort.Interface.
 func (ap *appendContext) Less(i, j int) bool {
-	ip := ap.editList[i].pos
-	jp := ap.editList[j].pos
-	ii := len(ip) - 1
-	jj := len(jp) - 1
-	for ii > 0 && jj > 0 {
-		if ip[ii].nodesBefore < jp[jj].nodesBefore {
-			return true
+	if len(ap.editList[i].pos) > 0 && len(ap.editList[j].pos) > 0 { // if both are in containers
+		ii := len(ap.editList[i].pos) - 1
+		jj := len(ap.editList[j].pos) - 1
+		for ii > 0 && jj > 0 {
+			if ap.editList[i].pos[ii].nodesBefore < ap.editList[j].pos[jj].nodesBefore {
+				return true
+			}
+			if ap.editList[i].pos[ii].nodesBefore > ap.editList[j].pos[jj].nodesBefore {
+				return false
+			}
+			ii--
+			jj--
 		}
-		if ip[ii].nodesBefore > jp[jj].nodesBefore {
-			return false
-		}
-		ii--
-		jj--
 	}
-	// run out of one or the other
 	return ap.editList[i].origSeq < ap.editList[j].origSeq
 }
 
+// append a treeRune at location idx to the output, group similar runes together to before calling append0().
 func (ap *appendContext) append(action rune, trs []treeRune, idx int) {
 	if idx >= len(trs) { // defending error found by fuzz testing
 		return
@@ -77,7 +78,7 @@ func (ap *appendContext) append(action rune, trs []treeRune, idx int) {
 	if tr.letter > 0 {
 		text = string(tr.letter)
 	}
-	if ap.lastProto == tr.leaf && ap.lastAction == action && tr.leaf.Type == html.TextNode && text != "" && posEqualDepth(ap.lastPos, tr.pos) {
+	if ap.lastProto == tr.leaf && ap.lastAction == action && tr.leaf.Type == html.TextNode && text != "" && posEqual(ap.lastPos, tr.pos) {
 		ap.lastText += text
 		return
 	}
@@ -104,11 +105,14 @@ func (ap *appendContext) flush0(action rune, proto *html.Node, pos posT) {
 	ap.lastText = ""
 }
 
+// append0 builds up the editList of things to do.
 func (ap *appendContext) append0(action rune, text string, proto *html.Node, pos posT) {
 	os := len(ap.editList)
 	ap.editList = append(ap.editList, editEntry{action, text, proto, pos, os})
 }
 
+// Sort the editList before using append1 on all the sorted edits.
+// Sorting is required in order to get edits inside containers in the right order.
 func (ap *appendContext) sortAndWrite() {
 	sort.Stable(ap)
 	for _, e := range ap.editList {
@@ -116,6 +120,7 @@ func (ap *appendContext) sortAndWrite() {
 	}
 }
 
+// append1 actually appends to the merged HTML node tree.
 func (ap *appendContext) append1(action rune, text string, proto *html.Node, pos posT) {
 	if proto == nil {
 		return
@@ -140,11 +145,11 @@ func (ap *appendContext) append1(action rune, text string, proto *html.Node, pos
 		}
 		switch action {
 		case '+':
-			insertNode.Attr = ap.c.InsertedSpan
+			insertNode.Attr = convertAttributes(ap.c.InsertedSpan)
 		case '-':
-			insertNode.Attr = ap.c.DeletedSpan
+			insertNode.Attr = convertAttributes(ap.c.DeletedSpan)
 		case '~':
-			insertNode.Attr = ap.c.ReplacedSpan
+			insertNode.Attr = convertAttributes(ap.c.ReplacedSpan)
 		}
 		insertNode.AppendChild(newLeaf)
 		newLeaf = insertNode
@@ -158,24 +163,13 @@ func (ap *appendContext) append1(action rune, text string, proto *html.Node, pos
 	appendPoint.AppendChild(newLeaf)
 }
 
-func lastNonSpaceSibling(n *html.Node) *html.Node {
-	var ret *html.Node
-	for sib := n.FirstChild; sib != nil; sib = sib.NextSibling {
-		if sib.Type == html.TextNode && strings.TrimSpace(sib.Data) == "" {
-			// ignore it
-		} else {
-			ret = sib
-		}
-	}
-	return ret
-}
-
+// find the append point in the merged HTML and from where to copy in the source.
 func (ap *appendContext) lastMatchingLeaf(proto *html.Node, action rune, pos posT) (appendPoint, protoAncestor *html.Node) {
 	if ap.targetBody == nil {
 		ap.targetBody = findBody(ap.target)
 	}
 	candidates := []*html.Node{}
-	for cand := ap.target; cand != nil; cand = lastNonSpaceSibling(cand) {
+	for cand := ap.target; cand != nil; cand = cand.LastChild {
 		candidates = append([]*html.Node{cand}, candidates...)
 	}
 	candidates = append(candidates, ap.targetBody) // longstop
@@ -195,6 +189,7 @@ func (ap *appendContext) lastMatchingLeaf(proto *html.Node, action rune, pos pos
 	return ap.targetBody, proto
 }
 
+// are two leaves of a node-tree equal?
 func (ap *appendContext) leavesEqual(a, b *html.Node, action rune, gpa, gpb posT) bool {
 	if a == b {
 		return true
@@ -211,7 +206,7 @@ func (ap *appendContext) leavesEqual(a, b *html.Node, action rune, gpa, gpb posT
 	if !nodeEqual(a, b) {
 		return false
 	}
-	if !posEqualDepth(gpa, gpb) {
+	if len(gpa) != len(gpb) {
 		return false
 	}
 	for i := 0; i < len(gpb); i++ {

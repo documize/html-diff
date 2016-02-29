@@ -1,7 +1,6 @@
 package htmldiff_test
 
 import (
-	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -10,16 +9,14 @@ import (
 	"testing"
 	"time"
 
-	"golang.org/x/net/html"
-
 	"github.com/documize/html-diff"
 )
 
 var cfg = &htmldiff.Config{
 	Granularity:  6,
-	InsertedSpan: []html.Attribute{{Key: "style", Val: "background-color: palegreen; text-decoration: underline;"}},
-	DeletedSpan:  []html.Attribute{{Key: "style", Val: "background-color: lightpink; text-decoration: line-through;"}},
-	ReplacedSpan: []html.Attribute{{Key: "style", Val: "background-color: lightskyblue; text-decoration: overline;"}},
+	InsertedSpan: []htmldiff.Attribute{{Key: "style", Val: "background-color: palegreen; text-decoration: underline;"}},
+	DeletedSpan:  []htmldiff.Attribute{{Key: "style", Val: "background-color: lightpink; text-decoration: line-through;"}},
+	ReplacedSpan: []htmldiff.Attribute{{Key: "style", Val: "background-color: lightskyblue; text-decoration: overline;"}},
 	CleanTags:    []string{"documize"},
 }
 
@@ -139,7 +136,8 @@ var simpleTests = []simpleTest{
     <td>Derby</td>
     <td><span style="background-color: lightpink; text-decoration: line-through;">and</span><i><span style="background-color: palegreen; text-decoration: underline;">locomotive</span></i></td> 
     <td><span style="background-color: lightpink; text-decoration: line-through;">J</span><span style="background-color: palegreen; text-decoration: underline;">w</span>o<span style="background-color: lightpink; text-decoration: line-through;">an</span><span style="background-color: palegreen; text-decoration: underline;">rks</span></td>
-  </tr></tbody></table>`,
+  </tr>
+</tbody></table>`,
 			`<table border="1" style="width:100%;">
   <tbody><tr>
     <td>Jack</td>
@@ -150,12 +148,13 @@ var simpleTests = []simpleTest{
     <td><span style="background-color: lightpink; text-decoration: line-through;">Derby</span><span style="background-color: palegreen; text-decoration: underline;">Samson</span></td>
     <td>and</td> 
     <td><span style="background-color: lightpink; text-decoration: line-through;">Jo</span><span style="background-color: palegreen; text-decoration: underline;">Delil</span>a<span style="background-color: lightpink; text-decoration: line-through;">n</span><span style="background-color: palegreen; text-decoration: underline;">h</span></td>
-  </tr><span style="background-color: palegreen; text-decoration: underline;">
-  </span><tr><span style="background-color: palegreen; text-decoration: underline;">
+  </tr>
+<span style="background-color: palegreen; text-decoration: underline;">  </span><tr><span style="background-color: palegreen; text-decoration: underline;">
     </span><td><span style="background-color: palegreen; text-decoration: underline;">Derby</span></td><span style="background-color: palegreen; text-decoration: underline;">
     </span><td><span style="background-color: palegreen; text-decoration: underline;">and</span></td><span style="background-color: palegreen; text-decoration: underline;"> 
     </span><td><span style="background-color: palegreen; text-decoration: underline;">Joan</span></td><span style="background-color: palegreen; text-decoration: underline;">
-  </span></tr></tbody></table>`,
+  </span></tr><span style="background-color: palegreen; text-decoration: underline;">
+</span></tbody></table>`,
 			`<table border="1" style="width:100%;">
   <tbody><tr>
     <td>Jack</td>
@@ -166,8 +165,8 @@ var simpleTests = []simpleTest{
     <td><span style="background-color: lightpink; text-decoration: line-through;">Derby</span><span style="background-color: palegreen; text-decoration: underline;">Samson</span></td>
     <td>and</td> 
     <td><span style="background-color: lightpink; text-decoration: line-through;">Jo</span><span style="background-color: palegreen; text-decoration: underline;">Delil</span>a<span style="background-color: lightpink; text-decoration: line-through;">n</span><span style="background-color: palegreen; text-decoration: underline;">h</span></td>
-  </tr><span style="background-color: palegreen; text-decoration: underline;">
-  </span><tr><span style="background-color: palegreen; text-decoration: underline;">
+  </tr>
+<span style="background-color: palegreen; text-decoration: underline;">  </span><tr><span style="background-color: palegreen; text-decoration: underline;">
     </span><td><span style="background-color: palegreen; text-decoration: underline;">Derby</span></td><span style="background-color: palegreen; text-decoration: underline;">
     </span><td><span style="background-color: palegreen; text-decoration: underline;">and</span></td><span style="background-color: palegreen; text-decoration: underline;"> 
     </span><td><span style="background-color: palegreen; text-decoration: underline;">Joan</span></td><span style="background-color: palegreen; text-decoration: underline;">
@@ -176,18 +175,20 @@ var simpleTests = []simpleTest{
     </span><td><span style="background-color: palegreen; text-decoration: underline;">Tweedledum</span></td><span style="background-color: palegreen; text-decoration: underline;">
     </span><td><span style="background-color: palegreen; text-decoration: underline;">and</span></td><span style="background-color: palegreen; text-decoration: underline;"> 
     </span><td><span style="background-color: palegreen; text-decoration: underline;">Tweedledee</span></td><span style="background-color: palegreen; text-decoration: underline;">
-  </span></tr></tbody></table>`,
+  </span></tr><span style="background-color: palegreen; text-decoration: underline;">
+</span></tbody></table>`,
 			`<table border="1" style="width:100%;"><span style="background-color: lightpink; text-decoration: line-through;">
   </span><tbody><tr><span style="background-color: lightpink; text-decoration: line-through;">
     </span><td><span style="background-color: lightpink; text-decoration: line-through;">Jack</span></td><span style="background-color: lightpink; text-decoration: line-through;">
     </span><td><span style="background-color: lightpink; text-decoration: line-through;">and</span></td><span style="background-color: lightpink; text-decoration: line-through;"> 
     </span><td><span style="background-color: lightpink; text-decoration: line-through;">Jill</span></td><span style="background-color: lightpink; text-decoration: line-through;">
   </span></tr><span style="background-color: lightpink; text-decoration: line-through;">
-  </span></tbody></table><div><b><i><span style="background-color: palegreen; text-decoration: underline;">...and now for something completely different.</span></i></b></div><table border="1" style="width:100%;"><tbody><tr><span style="background-color: lightpink; text-decoration: line-through;">
-    </span></tr><tr><td><span style="background-color: lightpink; text-decoration: line-through;">Derby</span></td><span style="background-color: lightpink; text-decoration: line-through;">
+  </span><tr><span style="background-color: lightpink; text-decoration: line-through;">
+    </span><td><span style="background-color: lightpink; text-decoration: line-through;">Derby</span></td><span style="background-color: lightpink; text-decoration: line-through;">
     </span><td><span style="background-color: lightpink; text-decoration: line-through;">and</span></td><span style="background-color: lightpink; text-decoration: line-through;"> 
     </span><td><span style="background-color: lightpink; text-decoration: line-through;">Joan</span></td><span style="background-color: lightpink; text-decoration: line-through;">
-  </span></tr></tbody></table>`}},
+  </span></tr><span style="background-color: lightpink; text-decoration: line-through;">
+</span></tbody></table><div><b><i><span style="background-color: palegreen; text-decoration: underline;">...and now for something completely different.</span></i></b></div>`}},
 
 	{[]string{"", `<ul><li>A</li><li>B</li><li>C</li></ul>`},
 		[]string{`<ul><li><span style="background-color: palegreen; text-decoration: underline;">A</span></li><li><span style="background-color: palegreen; text-decoration: underline;">B</span></li><li><span style="background-color: palegreen; text-decoration: underline;">C</span></li></ul>`}},
@@ -202,7 +203,76 @@ var simpleTests = []simpleTest{
 <div style="padding-left: 30px; text-indent: -10px;">• An XML element type name is written using a Type style. [<i>Example</i>: … as values of the xsd:anyURI data type.<i> end example</i>]</div>
 <div style="padding-left: 30px; text-indent: -10px;"> </div>
 <div style="padding-left: 30px; text-indent: -10px;">elephant.</div>`},
-		[]string{`<p>The following typographical conventions are used in this Standard:</p><div style="padding-left:30px;text-indent:-10px;">• The first occurrence of a new term is written in italics. [<i>Example</i>: … is considered <i>normative</i>. <i>end example</i>]</div><div style="padding-left:30px;text-indent:-10px;">• A term defined as a basic definition is written in bold. [<i>Example</i>: <b>behavior</b> — <b><span style="background-color: lightskyblue; text-decoration: overline;">External</span></b><span style="background-color: lightskyblue; text-decoration: overline;"> … </span><i><span style="background-color: lightskyblue; text-decoration: overline;">end example</span></i><span style="background-color: lightskyblue; text-decoration: overline;">]</span></div><div style="padding-left:30px;text-indent:-10px;">• The name of an XML elemen<span style="background-color: palegreen; text-decoration: underline;">t a</span>t<span style="background-color: palegreen; text-decoration: underline;">tribute</span> is written using an <span style="background-color: lightpink; text-decoration: line-through;">Element</span><span style="background-color: palegreen; text-decoration: underline;">Attribute</span> style. [<i>Example</i>: <span style="background-color: lightpink; text-decoration: line-through;">The</span><span style="background-color: palegreen; text-decoration: underline;">…</span> <span style="background-color: lightpink; text-decoration: line-through;">root element is document</span><span style="background-color: palegreen; text-decoration: underline;">an id attribute</span>.<i> end example</i>]</div><div style="padding-left:30px;text-indent:-10px;">•<span style="background-color: palegreen; text-decoration: underline;"> And</span> <span style="background-color: lightpink; text-decoration: line-through;">The name of an XML element attribute is written using an Attribute style. [</span><i><span style="background-color: lightpink; text-decoration: line-through;">Example</span></i><span style="background-color: lightpink; text-decoration: line-through;">: … an id attribute.</span><i><span style="background-color: lightpink; text-decoration: line-through;"> end example</span></i><span style="background-color: lightpink; text-decoration: line-through;">]</span><span style="background-color: palegreen; text-decoration: underline;">here is another entry in the list!</span></div><div style="padding-left:30px;text-indent:-10px;">• An XML element attribute value is written using a constant-width style. [<i>Example</i>: … value of CommentReference.<i> end example</i>]</div><div style="padding-left:30px;text-indent:-10px;">• An XML element type name is written using a Type style. [<i>Example</i>: … as values of the xsd:anyURI data type.<i> end example</i>]</div><div style="padding-left:30px;text-indent:-10px;"><span style="background-color: palegreen; text-decoration: underline;"> </span></div><div style="padding-left:30px;text-indent:-10px;"><span style="background-color: palegreen; text-decoration: underline;">elephant.</span></div>`}},
+		[]string{`<p>The following typographical conventions are used in this Standard:</p><span style="background-color: palegreen; text-decoration: underline;">
+</span><div style="padding-left:30px;text-indent:-10px;">• The first occurrence of a new term is written in italics. [<i>Example</i>: … is considered <i>normative</i>. <i>end example</i>]</div><span style="background-color: palegreen; text-decoration: underline;">
+</span><div style="padding-left:30px;text-indent:-10px;">• A term defined as a basic definition is written in bold. [<i>Example</i>: <b>behavior</b> — <b><span style="background-color: lightskyblue; text-decoration: overline;">External</span></b> … <i>end example</i>]</div><span style="background-color: palegreen; text-decoration: underline;">
+</span><div style="padding-left:30px;text-indent:-10px;">• The name of an XML element <span style="background-color: lightpink; text-decoration: line-through;">is written using </span>a<span style="background-color: lightpink; text-decoration: line-through;">n Element style. [</span><i><span style="background-color: lightpink; text-decoration: line-through;">Example</span></i><span style="background-color: lightpink; text-decoration: line-through;">: The </span><span style="background-color: palegreen; text-decoration: underline;">tt</span>r<span style="background-color: lightpink; text-decoration: line-through;">oot element </span>i<span style="background-color: lightpink; text-decoration: line-through;">s document.</span><i><span style="background-color: lightpink; text-decoration: line-through;"> end example</span></i><span style="background-color: lightpink; text-decoration: line-through;">]</span><span style="background-color: lightpink; text-decoration: line-through;">• The name of an XML element attri</span>bute is written using an Attribute style. [<i>Example</i>: … an id attribute.<i> end example</i>]</div><span style="background-color: palegreen; text-decoration: underline;">
+</span><div style="padding-left:30px;text-indent:-10px;">• An<span style="background-color: palegreen; text-decoration: underline;">d</span> <span style="background-color: palegreen; text-decoration: underline;">here is another entry in the list!</span></div><span style="background-color: palegreen; text-decoration: underline;">
+</span><div style="padding-left:30px;text-indent:-10px;"><span style="background-color: palegreen; text-decoration: underline;">• An </span>XML element attribute value is written using a constant-width style. [<i>Example</i>: … value of CommentReference.<i> end example</i>]</div><span style="background-color: palegreen; text-decoration: underline;">
+</span><div style="padding-left:30px;text-indent:-10px;">• An XML element type name is written using a Type style. [<i>Example</i>: … as values of the xsd:anyURI data type.<i> end example</i>]</div><span style="background-color: palegreen; text-decoration: underline;">
+</span><div style="padding-left:30px;text-indent:-10px;"><span style="background-color: palegreen; text-decoration: underline;"> </span></div><span style="background-color: palegreen; text-decoration: underline;">
+</span><div style="padding-left:30px;text-indent:-10px;"><span style="background-color: palegreen; text-decoration: underline;">elephant.</span></div>`}},
+
+	{[]string{`
+
+<p>The Graph that Generates Stories</p>
+
+<p>StoryGraph is a graph designed to generate and narrate the causal interactions between things in a world. The graph can be populated with entities and expressive rules about the interactions between specific entities or different classes of entities. General rules can create new entities in the graph populated with the specific entities that triggered the rule and attributes defined by those entities. Entities have lifetimes and (coming soon) behaviors that trigger events over time.</p>
+
+<p>Story graph is inspired by <a href="http://www.cs.cmu.edu/~cmartens/thesis/">progamming interactive worlds with linear logic</a> by <a href="http://www.cs.cmu.edu/~cmartens/index.html">Chris Martens</a> although it doesn&#8217;t realize any of the specific principles she develops in that thesis.</p>
+
+<p>There is a more or less fleshed out example in ./example.js that produces sometimes surreal interactions in a snowy forest. To run that example, clone the repo and run the example directly with node.js:</p>
+
+<pre><code class="language-shell">$ node example.js
+</code></pre>
+
+<p>You will see output something like this:</p>
+
+<pre><code>The river joins with the shadow for a moment. The river does a whirling dance with the shadow. A bluejay discovers the river dancing with the shadow. A bluejay observes the patterns of the river dancing with the shadow. A bluejay dwells in the stillness of life. A duck approaches the whisper. A duck and the whisper pass eachother quietly.
+</code></pre>
+
+<p>This project is licensed under the terms of the MIT license.</p>
+
+<p>##Types</p>
+
+<p>The first step is to define types. While it is possible to make rules that apply to specific things, you&#8217;ll probably want to make general rules that apply to classes of things. First the basics:</p>
+
+`, `<p>The Graph that Generates Stories</p>
+<p>StoryGraph is a graph designed to generate and narrate the causal interactions between things in a world. The graph can be populated with entities and expressive rules about the interactions between specific entities or different classes of entities. General rules can create new entities in the graph populated with the specific entities that triggered the rule and attributes defined by those entities. Entities have lifetimes and (coming soon) behaviors that trigger events over time.</p>
+<p>Story graph is inspired by <a href="http://www.cs.cmu.edu/~cmartens/thesis/">progamming interactive worlds with linear logic</a> by <a href="http://www.cs.cmu.edu/~cmartens/index.html">Chris Martens</a> although it doesn’t realize any of the specific principles she develops in that thesis.</p>
+<p>There is a more or less fleshed out example in ./example.js that produces sometimes surreal interactions in a snowy forest. To run that example, clone the repo and run the example directly with node.js:</p>
+<pre><code class="language-shell">$ node example.js
+</code></pre>
+<p>Elliott has input another line.</p>
+<p>You will see output something like this:</p>
+<pre><code>The river joins with the shadow for a moment. The river does a whirling dance with the shadow. A bluejay discovers the river dancing with the shadow. A bluejay observes the patterns of the river dancing with the shadow. A bluejay dwells in the stillness of life. A duck approaches the whisper. A duck and the whisper pass eachother quietly.
+</code></pre>
+<p>This project is licensed under the terms of the MIT license.</p>
+<p>##Types</p>
+<p>The first step is to define types. While it is possible to make rules that apply to specific things, you’ll probably want to make general rules that apply to classes of things. First the basics:</p>`},
+		[]string{`<p>The Graph that Generates Stories</p>
+<span style="background-color: lightpink; text-decoration: line-through;">
+</span><p>StoryGraph is a graph designed to generate and narrate the causal interactions between things in a world. The graph can be populated with entities and expressive rules about the interactions between specific entities or different classes of entities. General rules can create new entities in the graph populated with the specific entities that triggered the rule and attributes defined by those entities. Entities have lifetimes and (coming soon) behaviors that trigger events over time.</p><span style="background-color: lightpink; text-decoration: line-through;">
+</span>
+<p>Story graph is inspired by <a href="http://www.cs.cmu.edu/~cmartens/thesis/">progamming interactive worlds with linear logic</a> by <a href="http://www.cs.cmu.edu/~cmartens/index.html">Chris Martens</a> although it doesn’t realize any of the specific principles she develops in that thesis.</p><span style="background-color: lightpink; text-decoration: line-through;">
+</span>
+<p>There is a more or less fleshed out example in ./example.js that produces sometimes surreal interactions in a snowy forest. To run that example, clone the repo and run the example directly with node.js:</p>
+<span style="background-color: lightpink; text-decoration: line-through;">
+</span><pre><code class="language-shell">$ node example.js
+</code></pre>
+<p><span style="background-color: palegreen; text-decoration: underline;">Elliott has input another line.</span></p>
+<p>You will see output something like this:</p><span style="background-color: lightpink; text-decoration: line-through;">
+</span>
+<pre><code>The river joins with the shadow for a moment. The river does a whirling dance with the shadow. A bluejay discovers the river dancing with the shadow. A bluejay observes the patterns of the river dancing with the shadow. A bluejay dwells in the stillness of life. A duck approaches the whisper. A duck and the whisper pass eachother quietly.
+</code></pre>
+<span style="background-color: lightpink; text-decoration: line-through;">
+</span><p>This project is licensed under the terms of the MIT license.</p><span style="background-color: lightpink; text-decoration: line-through;">
+</span>
+<p>##Types</p><span style="background-color: lightpink; text-decoration: line-through;">
+</span>
+<p>The first step is to define types. While it is possible to make rules that apply to specific things, you’ll probably want to make general rules that apply to classes of things. First the basics:</p><span style="background-color: lightpink; text-decoration: line-through;">
+
+</span>`}},
 }
 
 func TestSimple(t *testing.T) {
@@ -232,25 +302,6 @@ func TestSimple(t *testing.T) {
 
 }
 
-func TestParseRender(t *testing.T) {
-	in := `<p style="">Document conformance is purely syntactic; it involves only Items&#160;1 and&#160;2 in &#167;<documize type="field-start"></documize>2.3<documize type="field-end"></documize> above.</p><p style="">A conforming document shall conform to the schema (Item&#160;1) and any additional syntax constraints (Item&#160;2).</p><p style="">The document character set shall conform to the Unicode Standard and ISO/IEC 10646-1, with either the UTF-8 or UTF-16 encoding form, as required by the XML&#160;1.0 standard.</p><p style="">Any XML element or attribute not explicitly included in this Standard shall use the extensibility mechanisms described by Parts 4 and 5 of this Standard.</p>`
-
-	doc, err := html.Parse(strings.NewReader(in))
-	if err != nil {
-		t.Error(err)
-		t.Fatal()
-	}
-	var buf bytes.Buffer
-	err = html.Render(&buf, doc)
-	if err != nil {
-		t.Error(err)
-		t.Fatal()
-	}
-	if buf.String() != `<html><head></head><body><p style="">Document conformance is purely syntactic; it involves only Items 1 and 2 in §<documize type="field-start"></documize>2.3<documize type="field-end"></documize> above.</p><p style="">A conforming document shall conform to the schema (Item 1) and any additional syntax constraints (Item 2).</p><p style="">The document character set shall conform to the Unicode Standard and ISO/IEC 10646-1, with either the UTF-8 or UTF-16 encoding form, as required by the XML 1.0 standard.</p><p style="">Any XML element or attribute not explicitly included in this Standard shall use the extensibility mechanisms described by Parts 4 and 5 of this Standard.</p></body></html>` {
-		t.Error("wrong result:", buf.String())
-	}
-}
-
 func TestTimeoutAndMemory(t *testing.T) {
 	dir := "." + string(os.PathSeparator) + "testin"
 	files, err := ioutil.ReadDir(dir)
@@ -277,7 +328,7 @@ func TestTimeoutAndMemory(t *testing.T) {
 
 	var ms runtime.MemStats
 	var alloc1 uint64
-	goroutineCount1 := 2 // the number of goroutines in a quiet state
+	goroutineCount1 := 2 // the number of goroutines in a quiet state, more if test flags are used
 	for i := 0; i < 2; i++ {
 		testToMem(testHTML, names, t)
 		limit := 60

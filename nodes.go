@@ -14,17 +14,7 @@ func copyNode(to, from *html.Node) {
 }
 
 func nodeEqual(base, comp *html.Node) bool {
-	if comp.Data != base.Data ||
-		comp.DataAtom != base.DataAtom ||
-		comp.Namespace != base.Namespace ||
-		comp.Type != base.Type ||
-		len(comp.Attr) != len(base.Attr) {
-		return false
-	}
-	if !attrEqual(base, comp) {
-		return false
-	}
-	return true
+	return base.Data == comp.Data && nodeEqualExText(base, comp)
 }
 
 // findBody finds the first body HTML node if it exists in the tree. Required to bypass the page title text.
@@ -41,7 +31,7 @@ func findBody(n *html.Node) *html.Node {
 	return nil
 }
 
-// find the first leaf in the tree that is a text node
+// find the first leaf in the tree that is a text node.
 func firstLeaf(n *html.Node) (*html.Node, bool) {
 	if n != nil {
 		switch n.Type {
@@ -57,4 +47,22 @@ func firstLeaf(n *html.Node) (*html.Node, bool) {
 		}
 	}
 	return nil, false
+}
+
+// find if this or any parent is a container element where position is important like a list or table.
+func inContainer(n *html.Node) bool {
+	if n == nil {
+		return false
+	}
+	if n.Type == html.ElementNode {
+		switch n.DataAtom {
+		case atom.Body:
+			return false
+		case atom.Td, atom.Th, atom.Tr, atom.Tbody, atom.Thead, atom.Tfoot,
+			atom.Table, atom.Caption, atom.Colgroup, atom.Col, // tables
+			atom.Li, atom.Ul, atom.Ol: // lists
+			return true
+		}
+	}
+	return inContainer(n.Parent)
 }
