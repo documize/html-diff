@@ -12,7 +12,7 @@ Usage:
 		CleanTags:    []string{""},
 	}
 	res, err := cfg.HTMLdiff([]string{previousHTML, latestHTML})
-    mergedHTML := res[0]
+	mergedHTML := res[0]
 ```
 ![see example_test.go](example_test.png)
 
