@@ -8,6 +8,7 @@ _obj
 _test
 testout
 fuzz
+.vscode
 
 # Architecture specific extensions/prefixes
 *.[568vq]
