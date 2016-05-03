@@ -70,7 +70,7 @@ func (c *Config) HTMLdiff(versions []string) ([]string, error) {
 			parallelErrors <- err
 		}(v, vv)
 	}
-	for _ = range versions {
+	for range versions {
 		if err := <-parallelErrors; err != nil {
 			return nil, err
 		}
@@ -130,7 +130,7 @@ func (c *Config) HTMLdiff(versions []string) ([]string, error) {
 			parallelErrors <- errors.New("correct render wrapper HTML not found: " + string(mergedHTML))
 		}(m)
 	}
-	for _ = range mergedHTMLs {
+	for range mergedHTMLs {
 		if err := <-parallelErrors; err != nil {
 			return nil, err
 		}

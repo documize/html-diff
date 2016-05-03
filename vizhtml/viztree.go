@@ -1,4 +1,4 @@
-// Package vizhtml provides a way to display html node trees for debug purposes. 
+// Package vizhtml provides a way to display html node trees for debug purposes.
 package vizhtml
 
 import (
